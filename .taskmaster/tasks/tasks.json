@@ -1,0 +1,1597 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Project and Environment Setup (Next.js 15 + Supabase + Tooling)",
+        "description": "Initialize FlowTrack monorepo with Next.js 15 App Router, TypeScript, Tailwind, shadcn/ui, Serwist PWA, Supabase client, ESLint/Prettier/Husky, Docker-based local stack, and CI-ready scripts.",
+        "details": "Implementation steps:\n- Create app: npx create-next-app@latest flowtrack --ts --eslint --src-dir --app --tailwind\n- Install core deps: pnpm add @supabase/supabase-js@^2.45 zustand@^5 zod@^3 @tanstack/react-query@^5 @tanstack/react-query-devtools@^5 @serwist/next@^9 dexie@^4 react-hook-form@^7 recharts@^2 @react-pdf/renderer@^3 @radix-ui/react-icons resend@^3 stripe@^16\n- Dev deps: pnpm add -D typescript vitest@^1 @testing-library/react@^16 @testing-library/jest-dom@^6 @types/node@latest @types/react @types/react-dom eslint prettier husky lint-staged tsx@^4\n- Tailwind config: npx tailwindcss init -p; set content to src/app/**/*; add shadcn/ui styles\n- Install shadcn/ui: pnpm dlx shadcn-ui@latest init; generate button, input, table, dialog, breadcrumb components\n- Serwist: configure next.config.js with withSerwist as per PRD; create app/sw.ts with routes, caching strategies (stale-while-revalidate for HTML/JSON, CacheFirst for images)\n- Supabase local: pnpm dlx supabase init; pnpm dlx supabase start; add .env.local with NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY\n- Stripe: pnpm dlx stripe login; add STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET to .env\n- Resend: add RESEND_API_KEY\n- Google Maps: add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY\n- Create shared libs: src/lib/supabaseClient.ts (createBrowserClient, createServerClient), src/lib/env.ts (zod-validated env), src/lib/tenant.ts (subdomain parsing)\n- Add package.json scripts: dev, build, start, typecheck, lint, test, prepare (husky), supabase (local)\n- Husky hooks: pre-commit: lint-staged; lint-staged config for ts/tsx formatting\nPseudo-code:\n- supabaseClient.ts:\nexport const createClient = () => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: true, autoRefreshToken: true } });\n- middleware.ts subdomain parsing stub for tenant resolution\n- app/providers.tsx wraps QueryClientProvider, Theme provider\n",
+        "testStrategy": "Validation:\n- Run pnpm test to execute Vitest baseline; verify providers render without error\n- E2E smoke with Playwright later; for now: launch dev, ensure PWA SW registers (navigator.serviceWorker.controller)\n- Verify environment parsing via env zod throws on missing keys\n- Supabase local: supabase status returns healthy; Next.js fetch to /api/health returns 200",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize monorepo and pnpm workspace",
+            "description": "Create FlowTrack repo root with pnpm workspace, base git setup, and editor configs.",
+            "dependencies": [],
+            "details": "- Commands:\n  - mkdir flowtrack && cd flowtrack\n  - git init -b main\n  - pnpm init -y\n  - echo \"packages:\\n  - apps/*\\n  - packages/*\" > pnpm-workspace.yaml\n  - echo \"node_modules\\n.pnpm-store\\n.env*\\n.next\\nout\\n.DS_Store\\ncoverage\\n.vscode\\n.husky/_/\\n\" > .gitignore\n  - echo \"node >= 18\" > .nvmrc (optional)\n  - Create .editorconfig with 2-space indentation, LF, UTF-8\n  - git add . && git commit -m \"chore: init repo and pnpm workspace\"\n- Files to add/modify:\n  - pnpm-workspace.yaml, .gitignore, .editorconfig, .nvmrc, package.json\n- Acceptance checks:\n  - pnpm -v prints a version\n  - pnpm -w -r list runs without errors and recognizes workspace (no packages yet)\n- Rollback:\n  - cd .. && rm -rf flowtrack",
+            "status": "in-progress",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Scaffold Next.js 15 App Router app in apps/web",
+            "description": "Generate Next.js 15 app with TypeScript, ESLint, src directory, App Router, and Tailwind.",
+            "dependencies": [
+              "1.1"
+            ],
+            "details": "- Commands:\n  - mkdir -p apps && cd apps\n  - npx create-next-app@latest web --ts --eslint --src-dir --app --tailwind --use-pnpm --no-git\n  - cd ..\n  - At repo root, add scripts to package.json:\n    - \"dev\": \"pnpm -C apps/web dev\",\n    - \"build\": \"pnpm -C apps/web build\",\n    - \"start\": \"pnpm -C apps/web start\"\n- Files to add/modify:\n  - apps/web/* (CNA scaffold), root package.json scripts\n- Acceptance checks:\n  - pnpm dev starts at http://localhost:3000 and shows Next.js starter\n  - pnpm build completes without error\n- Rollback:\n  - rm -rf apps/web\n  - Remove added root scripts and git revert last commit if needed",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "TypeScript base config and path aliases",
+            "description": "Establish root tsconfig, app tsconfig with path aliases, and base providers stub.",
+            "dependencies": [
+              "1.2"
+            ],
+            "details": "- Commands:\n  - Create tsconfig.base.json at repo root with strict settings, jsx: react-jsx, and baseUrl: \".\"\n  - In apps/web/tsconfig.json, set \"extends\": \"../../tsconfig.base.json\" and configure paths:\n    - \"@/*\": [\"src/*\"], \"@lib/*\": [\"src/lib/*\"]\n  - Create apps/web/src/app/providers.tsx wrapping QueryClientProvider and theme provider stub\n- Files to add/modify:\n  - tsconfig.base.json, apps/web/tsconfig.json, apps/web/src/app/providers.tsx\n- Acceptance checks:\n  - pnpm build succeeds\n  - Import from \"@/lib/...\" resolves in a sample file\n  - Render test of providers component compiles (to be validated in test subtask)\n- Rollback:\n  - Restore original apps/web/tsconfig.json and delete tsconfig.base.json/providers.tsx",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Install core and dev dependencies",
+            "description": "Add core libraries (Supabase, React Query, Zustand, Zod, Serwist, etc.) and dev tooling (Vitest, RTL, ESLint/Prettier, Husky).",
+            "dependencies": [
+              "1.2"
+            ],
+            "details": "- Commands (run at repo root):\n  - pnpm -C apps/web add @supabase/supabase-js@^2.45 zustand@^5 zod@^3 @tanstack/react-query@^5 @tanstack/react-query-devtools@^5 @serwist/next@^9 dexie@^4 react-hook-form@^7 recharts@^2 @react-pdf/renderer@^3 @radix-ui/react-icons resend@^3 stripe@^16\n  - pnpm -C apps/web add -D typescript vitest@^1 @testing-library/react@^16 @testing-library/jest-dom@^6 @types/node@latest @types/react @types/react-dom eslint prettier husky lint-staged tsx@^4\n  - Add scripts (root or apps/web as appropriate):\n    - root: \"typecheck\": \"pnpm -C apps/web tsc --noEmit\",\n    - apps/web: \"typecheck\": \"tsc --noEmit\", \"test\": \"vitest --run\", \"lint\": \"next lint\"\n- Files to add/modify:\n  - apps/web/package.json scripts and dependencies\n- Acceptance checks:\n  - pnpm -C apps/web list shows installed libs\n  - pnpm typecheck runs without missing types\n- Rollback:\n  - pnpm -C apps/web remove <all added pkgs>\n  - Revert package.json script changes",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Tailwind configuration and shadcn/ui initialization",
+            "description": "Configure Tailwind content paths, add shadcn/ui, and generate base UI components.",
+            "dependencies": [
+              "1.2",
+              "1.4"
+            ],
+            "details": "- Commands (from apps/web):\n  - npx tailwindcss init -p\n  - Update tailwind.config.ts content: [\"./src/**/*.{ts,tsx}\"]\n  - Ensure global styles import includes Tailwind layers in src/app/globals.css\n  - pnpm dlx shadcn-ui@latest init\n  - pnpm dlx shadcn-ui@latest add button input table dialog breadcrumb\n- Files to add/modify:\n  - apps/web/tailwind.config.ts, apps/web/postcss.config.js, apps/web/src/app/globals.css\n  - apps/web/src/components/ui/* (generated)\n- Acceptance checks:\n  - pnpm dev renders a page using <Button /> with Tailwind styles applied\n  - No Tailwind content purge warnings for src/*\n- Rollback:\n  - Remove generated components and revert tailwind/postcss configs",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Serwist PWA integration",
+            "description": "Integrate Serwist with Next.js, add service worker and caching strategies.",
+            "dependencies": [
+              "1.2",
+              "1.4"
+            ],
+            "details": "- Commands:\n  - Edit apps/web/next.config.mjs to wrap config with withSerwist from \"@serwist/next\" (set swSrc: \"src/app/sw.ts\")\n  - Create apps/web/src/app/sw.ts with routes and caching:\n    - Stale-While-Revalidate for HTML/JSON/API\n    - CacheFirst for images/fonts/static assets with versioned cache names\n  - Ensure SW registration (Serwist plugin auto-injects). If needed, add a small client component to call navigator.serviceWorker.register(\"/sw.js\") in production\n- Files to add/modify:\n  - apps/web/next.config.mjs, apps/web/src/app/sw.ts\n- Acceptance checks:\n  - pnpm build && pnpm start\n  - In browser console: !!navigator.serviceWorker.controller after a reload\n  - Application tab shows SW controlling scope and caches populated per strategy\n- Rollback:\n  - Revert next.config.mjs and delete sw.ts; clear browser site data",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Supabase local stack and client library",
+            "description": "Initialize Supabase locally and add a typed browser client helper.",
+            "dependencies": [
+              "1.2"
+            ],
+            "details": "- Commands (repo root):\n  - pnpm dlx supabase@latest init\n  - pnpm dlx supabase start\n  - Create apps/web/.env.local with:\n    - NEXT_PUBLIC_SUPABASE_URL=<from supabase start>\n    - NEXT_PUBLIC_SUPABASE_ANON_KEY=<from supabase start>\n  - Add root scripts: \"supabase:up\": \"supabase start\", \"supabase:stop\": \"supabase stop\"\n  - Create apps/web/src/lib/supabaseClient.ts with:\n    - export const createClient = () => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: true, autoRefreshToken: true } });\n- Files to add/modify:\n  - supabase/ (CLI-managed), apps/web/.env.local, apps/web/src/lib/supabaseClient.ts, root package.json scripts\n- Acceptance checks:\n  - pnpm supabase:up shows healthy services\n  - pnpm dev and a quick console call to createClient().auth.getSession() resolves without throwing\n- Rollback:\n  - pnpm supabase:stop && rm -rf supabase\n  - Remove .env.local keys and supabaseClient.ts; revert package.json scripts",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Environment schema (zod) and tenant utilities",
+            "description": "Validate env vars with zod and add tenant subdomain parsing with middleware stub.",
+            "dependencies": [
+              "1.2",
+              "1.4"
+            ],
+            "details": "- Commands:\n  - Create apps/web/src/lib/env.ts defining zod schema for required keys: NODE_ENV, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, RESEND_API_KEY, NEXT_PUBLIC_GOOGLE_MAPS_API_KEY\n  - Export a frozen env object; throw informative errors in dev/test when missing\n  - Create apps/web/src/lib/tenant.ts with getTenantFromHost(host: string) that extracts subdomain (e.g., acme.dev.local -> acme)\n  - Add apps/web/middleware.ts stub to parse host, set request headers like x-tenant-id, and continue\n- Files to add/modify:\n  - apps/web/src/lib/env.ts, apps/web/src/lib/tenant.ts, apps/web/middleware.ts\n- Acceptance checks:\n  - Running pnpm dev without required keys logs/throws zod errors as expected\n  - Unit tests (in a later test subtask) confirm getTenantFromHost for common cases\n- Rollback:\n  - Delete env.ts, tenant.ts, and middleware.ts",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Stripe, Resend, and Google Maps key wiring",
+            "description": "Authenticate Stripe CLI and add Stripe/Resend/Maps keys with minimal wiring.",
+            "dependencies": [
+              "1.8",
+              "1.4"
+            ],
+            "details": "- Commands:\n  - pnpm dlx stripe login\n  - Add secrets to env files:\n    - Root .env: STRIPE_SECRET_KEY=..., STRIPE_WEBHOOK_SECRET=..., RESEND_API_KEY=...\n    - apps/web/.env.local: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=...\n  - Update apps/web/src/lib/env.ts to include/validate the above keys\n  - Optional thin wrappers:\n    - apps/web/src/lib/stripe.ts: export const stripe = new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: \"2024-06-20\" });\n    - apps/web/src/lib/resend.ts: export const resend = new Resend(env.RESEND_API_KEY);\n  - Add script: root package.json -> \"stripe:listen\": \"stripe listen --forward-to localhost:3000/api/stripe/webhook\"\n- Files to add/modify:\n  - .env, apps/web/.env.local, apps/web/src/lib/env.ts (+ optional stripe.ts, resend.ts)\n- Acceptance checks:\n  - node -e \"console.log(!!process.env.STRIPE_SECRET_KEY)\" returns true\n  - Stripe: pnpm stripe:listen starts (no auth errors)\n  - App boot logs no env validation errors\n- Rollback:\n  - Remove keys from .env/.env.local and revoke from providers\n  - Delete optional wrappers and script entry",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "ESLint, Prettier, Vitest, and RTL baseline",
+            "description": "Configure linting/formatting and unit testing with Vitest + Testing Library.",
+            "dependencies": [
+              "1.2",
+              "1.4"
+            ],
+            "details": "- Commands:\n  - Create root .eslintrc.cjs extending \"next/core-web-vitals\"; add import/order and TypeScript rules; create .eslintignore\n  - Create .prettierrc and .prettierignore (align with repo conventions)\n  - In apps/web, add vitest.config.ts with jsdom environment and path alias support; create setupTests.ts importing @testing-library/jest-dom\n  - Add sample test apps/web/src/app/providers.test.tsx rendering <Providers /> without errors\n  - Scripts:\n    - root: \"lint\": \"pnpm -C apps/web lint\", \"test\": \"pnpm -C apps/web test\"\n- Files to add/modify:\n  - .eslintrc.cjs, .eslintignore, .prettierrc, .prettierignore\n  - apps/web/vitest.config.ts, apps/web/setupTests.ts, apps/web/src/app/providers.test.tsx\n- Acceptance checks:\n  - pnpm lint passes with no errors\n  - pnpm test runs and passes the sample render test\n- Rollback:\n  - Remove configs and test files; delete added scripts from package.json",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Husky and lint-staged setup",
+            "description": "Add pre-commit hooks to run lint-staged for fast formatting and lint checks.",
+            "dependencies": [
+              "1.10"
+            ],
+            "details": "- Commands:\n  - pnpm dlx husky init\n  - Add root package.json: \"prepare\": \"husky\"\n  - Create .husky/pre-commit with: \"#!/bin/sh\" newline \". \\\"$(dirname \"$0\")/_/husky.sh\\\"\" newline \"pnpm lint-staged\"\n  - Add lint-staged config (root):\n    - lint-staged.config.mjs with patterns: \"*.{ts,tsx,js,jsx,json,md,css}\": [\"prettier --write\"], \"apps/web/**/*.{ts,tsx}\": [\"pnpm -C apps/web eslint --fix\"]\n- Files to add/modify:\n  - .husky/*, lint-staged.config.mjs, root package.json (prepare)\n- Acceptance checks:\n  - git add -A && git commit -m \"test\" triggers lint-staged and prevents commit on lint errors\n- Rollback:\n  - rm -rf .husky lint-staged.config.mjs\n  - Remove prepare script from package.json",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "Docker local stack and CI workflow",
+            "description": "Create Dockerfile and docker-compose for web app and add GitHub Actions CI for typecheck/lint/test/build.",
+            "dependencies": [
+              "1.1",
+              "1.6",
+              "1.7",
+              "1.10",
+              "1.11"
+            ],
+            "details": "- Commands:\n  - Create apps/web/Dockerfile (multi-stage):\n    - base: node:20-alpine, install pnpm, copy lockfiles, pnpm install --frozen-lockfile\n    - build: RUN pnpm build (Next output: standalone)\n    - runtime: copy .next/standalone and .next/static; expose 3000; CMD [\"node\", \"server.js\"]\n  - Create .dockerignore: node_modules, .next, pnpm-store, coverage, .env*, supabase/\n  - Create docker-compose.yml at root with service web:\n    - build: context: ., dockerfile: apps/web/Dockerfile\n    - ports: \"3000:3000\"\n    - env_file: [.env, apps/web/.env.local]\n  - Create .github/workflows/ci.yml:\n    - Triggers: push/pull_request\n    - Setup Node 20, install pnpm, cache pnpm store\n    - pnpm install\n    - pnpm typecheck && pnpm lint && pnpm test && pnpm build\n- Files to add/modify:\n  - apps/web/Dockerfile, .dockerignore, docker-compose.yml, .github/workflows/ci.yml\n- Acceptance checks:\n  - docker compose up --build web serves app at http://localhost:3000\n  - CI passes on a PR with all steps green\n- Rollback:\n  - Delete Dockerfile, docker-compose.yml, .dockerignore, workflow file and remove any related badges/scripts",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Database Schema, Migrations, and RLS in Supabase",
+        "description": "Design PostgreSQL schema for tenants, users, customers, meter_readings, invoices; implement row-level security, helper functions, and performance indexes via Supabase migrations.",
+        "details": "Implementation steps:\n- Create SQL migration 0001_init.sql with tables and enums aligning to PRD interfaces\n- Enable RLS on all tables; implement auth.tenant_id() function (from PRD Appendix)\n- Policies:\n  - tenant_isolation on all tenant-scoped tables USING tenant_id = auth.tenant_id() WITH CHECK same\n  - customer_self_service on invoices: allow SELECT where customer_id = auth.uid() OR tenant match (as PRD)\n- Add helpful unique indexes: tenants.subdomain unique, customers(account_number, tenant_id) unique, invoices(invoice_number, tenant_id) unique\n- Add foreign keys: users.tenant_id -> tenants.id; customers.tenant_id -> tenants.id; meter_readings(customer_id, meter_id) -> customers, meters if separate; invoices.customer_id -> customers.id\n- Add GIN index for JSONB if needed (settings) and B-Tree for composite queries given in PRD\n- Seed script 0002_seed.sql: create sample tenant, roles, and a couple of customers for dev\nPseudo-code (migration snippets):\nCREATE TABLE tenants (...);\nCREATE TABLE users (..., tenant_id uuid REFERENCES tenants(id), role text CHECK (role IN ('admin','manager','operator','viewer')),...);\nCREATE TABLE customers (..., tenant_id uuid REFERENCES tenants(id), account_number text NOT NULL, UNIQUE(tenant_id, account_number));\nCREATE TABLE meter_readings (..., tenant_id uuid, customer_id uuid, meter_id text, reading numeric, previous_reading numeric, consumption numeric, reading_date timestamptz, ...);\nCREATE TABLE invoices (..., tenant_id uuid, customer_id uuid, invoice_number text, period_start date, period_end date, line_items jsonb, totals jsonb, status text, ...);\nALTER TABLE ... ENABLE ROW LEVEL SECURITY;\nCREATE OR REPLACE FUNCTION auth.tenant_id() RETURNS text AS $$ ... $$ LANGUAGE SQL STABLE;\nCREATE POLICY tenant_isolation ON customers FOR ALL USING (tenant_id = auth.tenant_id()) WITH CHECK (tenant_id = auth.tenant_id());\nCREATE INDEX idx_customers_tenant_status ON customers(tenant_id, status);\n",
+        "testStrategy": "Validation:\n- supabase db reset && supabase db lint; ensure no errors\n- SQL unit checks: SELECT with simulated JWT: select set_config('request.jwt.claims','{\"tenant_id\":\"t1\"}', true); ensure cross-tenant rows are hidden\n- RLS tests using supabase-js from a script to confirm isolation for different tenant JWTs\n- Performance: EXPLAIN ANALYZE sample queries for indexes used",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Model review, ERD, and access patterns",
+            "description": "Review PRD, finalize entities/relationships, and define access patterns to drive schema and indexes.",
+            "dependencies": [],
+            "details": "- Confirm tables: tenants, users, customers, meter_readings, invoices (and any auxiliary like invoice_sequences or settings as needed by PRD).\n- Define columns, data types (uuid vs text), nullability, defaults, enums (roles, invoice_status), and generated columns if useful.\n- Establish tenant scoping: which tables carry tenant_id and multi-tenant boundaries.\n- Draft ERD with keys and relationships; decide on meter_id strategy (text vs separate meters table per PRD).\n- Enumerate core queries per table (filters, sorts, joins) to inform indexing.\n- DoD: ERD approved; final attribute list per table; list of access patterns documented and accepted.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Create 0001_init.sql with core tables and enums",
+            "description": "Author base migration to create enums and core tables aligned to PRD interfaces.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "- Create enums: user_role ('admin','manager','operator','viewer'), invoice_status (e.g., 'draft','sent','paid','overdue','void').\n- Tables with common columns: id uuid pk default gen_random_uuid(), tenant_id uuid (where scoped), created_at timestamptz default now(), updated_at timestamptz default now().\n- tenants: name, subdomain unique candidate, settings jsonb nullable.\n- users: auth_user_id uuid unique, tenant_id fk, role user_role not null, profile fields.\n- customers: tenant_id fk, account_number text not null, name/contact fields, status, optional auth_user_id if customer portal linking is required.\n- meter_readings: tenant_id, customer_id fk, meter_id text, reading numeric, previous_reading numeric, consumption numeric (or computed), reading_date timestamptz, metadata jsonb.\n- invoices: tenant_id, customer_id fk, invoice_number text, period_start date, period_end date, line_items jsonb, totals jsonb, status invoice_status, issued_at, due_date.\n- Add updated_at trigger function and triggers for tables that mutate.\n- DoD: Migration runs clean on supabase db reset; schema matches ERD; supabase db lint passes.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Define foreign keys, constraints, and cascades",
+            "description": "Add FKs, unique constraints, and ON DELETE policies consistent with multi-tenant integrity.",
+            "dependencies": [
+              "2.2"
+            ],
+            "details": "- FKs: users.tenant_id -> tenants.id (ON DELETE CASCADE); customers.tenant_id -> tenants.id (ON DELETE CASCADE); meter_readings.customer_id -> customers.id (ON DELETE CASCADE); invoices.customer_id -> customers.id (ON DELETE RESTRICT to preserve financial records unless PRD states otherwise).\n- Optional: users.auth_user_id -> auth.users(id) if using Supabase auth linkage.\n- Unique constraints/indexes: tenants.subdomain UNIQUE; customers(tenant_id, account_number) UNIQUE; invoices(tenant_id, invoice_number) UNIQUE.\n- Check constraints: role in enum; reading >= 0; totals numeric checks; date ranges valid (period_start <= period_end).\n- DoD: All constraints created; FK behavior reviewed and approved; migration idempotent and lint passes.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Enable RLS and implement auth.tenant_id() helper",
+            "description": "Turn on RLS for all tenant-scoped tables and create the JWT helper function.",
+            "dependencies": [
+              "2.2"
+            ],
+            "details": "- ALTER TABLE ... ENABLE ROW LEVEL SECURITY for users, customers, meter_readings, invoices, and any tenant-scoped tables.\n- Implement auth.tenant_id() STABLE function that extracts tenant_id from request.jwt.claims; ensure return type matches tenant_id column (uuid recommended). Guard against NULL when unauthenticated.\n- Provide local testing helper: set_config('request.jwt.claims','{\"tenant_id\":\"...\",\"role\":\"...\"}', true).\n- DoD: RLS enabled across tables; helper function created in correct schema; smoke-test SELECT using set_config shows restricted visibility.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Author tenant isolation policies for all scoped tables",
+            "description": "Create tenant_isolation policies enforcing tenant_id = auth.tenant_id() with matching CHECK.",
+            "dependencies": [
+              "2.4"
+            ],
+            "details": "- For each tenant-scoped table, add policies for SELECT, INSERT, UPDATE, DELETE: USING (tenant_id = auth.tenant_id()) WITH CHECK (tenant_id = auth.tenant_id()).\n- Ensure service role and migration role remain unaffected (bypass via postgres role).\n- Add role conditioning if needed (e.g., staff roles) but default to strict tenant match.\n- DoD: Cross-tenant access blocked in SQL tests; inserts/updates require matching tenant_id; lint passes.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Add invoice customer_self_service policy",
+            "description": "Allow customers to view their own invoices while preserving tenant isolation for staff.",
+            "dependencies": [
+              "2.4"
+            ],
+            "details": "- Add SELECT policy on invoices permitting access when customer_id = auth.uid() (or via customers.auth_user_id mapping per PRD) OR tenant_id = auth.tenant_id() for staff.\n- Keep INSERT/UPDATE/DELETE restricted to staff roles within tenant isolation as appropriate.\n- Document any mapping required between auth users and customers.\n- DoD: Customer JWT sees only their invoices; staff JWT sees tenant invoices; unauthorized access denied in tests.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Create performance indexes (unique, composite, GIN)",
+            "description": "Add indexes to support frequent queries and JSONB access; verify coverage of access patterns.",
+            "dependencies": [
+              "2.2",
+              "2.3"
+            ],
+            "details": "- Unique indexes: tenants(subdomain), customers(tenant_id, account_number), invoices(tenant_id, invoice_number).\n- Composite B-tree indexes: customers(tenant_id, status), invoices(tenant_id, status, period_end DESC), invoices(tenant_id, customer_id, issued_at DESC), meter_readings(tenant_id, customer_id, reading_date DESC).\n- JSONB GIN indexes on settings/line_items/totals if filtered by keys; add partial indexes if PRD filters are selective.\n- Verify index names and concurrent creation where needed; run ANALYZE after migration.\n- DoD: EXPLAIN shows index usage for key queries; no redundant indexes; lint passes.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Write 0002_seed.sql for development data",
+            "description": "Seed sample tenant, users with roles, customers, readings, and example invoices for local/dev.",
+            "dependencies": [
+              "2.2",
+              "2.3"
+            ],
+            "details": "- Insert a sample tenant with subdomain, settings.\n- Insert users linked to tenant with roles: admin, manager, operator, viewer; optionally link to auth.users for local testing.\n- Insert a few customers with distinct account_number values; optionally link customers to auth users for customer portal testing.\n- Insert meter_readings for recent periods; insert invoices with line_items and totals.\n- If using invoice_sequences, seed starting value per tenant.\n- DoD: supabase db reset applies seeds without errors; sample data visible with service role; counts documented.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "RLS test scripts: SQL simulation and supabase-js JWT checks",
+            "description": "Create scripts to validate isolation and customer self-service via SQL and client SDK.",
+            "dependencies": [
+              "2.4",
+              "2.5",
+              "2.6",
+              "2.8"
+            ],
+            "details": "- SQL script: use set_config to simulate different JWTs (different tenant_id, roles, customer vs staff) and assert row counts/denials across tables.\n- Node script with supabase-js: generate signed JWTs (service for setup, anon for queries) and test that cross-tenant reads/writes fail; customer can read only their invoices.\n- CI-friendly: exit non-zero on failure; print minimal diagnostics.\n- DoD: All planned scenarios pass; regressions would fail CI; artifacts checked into repo under tests/db.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Performance validation and documentation of access patterns",
+            "description": "Run EXPLAIN/ANALYZE on key queries, adjust indexes if needed, and document DoD per table.",
+            "dependencies": [
+              "2.7",
+              "2.8"
+            ],
+            "details": "- Define representative queries for tenants, users, customers, meter_readings, invoices per PRD.\n- Capture EXPLAIN (ANALYZE, BUFFERS) results before/after indexes; ensure index scans and acceptable timings on seeded volumes.\n- Tweak or add partial/covering indexes if necessary; remove unused ones.\n- Documentation: access patterns, RLS policy summary, known limitations, and DoD per table (RLS enforced, indexes used by queries, lint passes).\n- DoD: Document approved; all target queries show index usage; no sequential scans on large tables unless intended.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Multi-tenant Authentication, RBAC, and Subdomain Routing",
+        "description": "Implement tenant sign-up, login/logout, role-based access control, JWT custom claims with tenant_id, and subdomain-based tenant resolution for isolation.",
+        "details": "Implementation steps:\n- Supabase Auth config:\n  - On tenant registration, create tenant row, then user with role=admin; store tenant_id in user metadata\n  - Create Postgres function and trigger to inject tenant_id into JWT (Supabase Auth's JWT custom claims via auth JWT hooks or using Postgres policies to derive auth.tenant_id())\n- Next.js routes:\n  - POST /api/auth/register: validate input (zod), create tenant, set subdomain, create user with supabase.auth.admin.createUser, send magic link optional\n  - POST /api/auth/login: supabase.auth.signInWithPassword\n  - POST /api/auth/refresh: supabase.auth.refreshSession\n  - POST /api/auth/magic-link: supabase.auth.signInWithOtp for customer portal\n- Subdomain routing:\n  - middleware.ts: parse request headers host to derive tenant subdomain; attach to request headers x-tenant-subdomain; redirect marketing root for bare domain\n- Protected routes:\n  - Route Handlers check session via createServerClient and ensure tenant match\n  - RBAC utility canAccess(user.role, permission)\n- Zustand store for user state and tenant context, persisted in sessionStorage\nPseudo-code:\n// middleware.ts\nconst host = req.headers.get('host')!; const sub = host.split('.')[0]; req.headers.set('x-tenant', sub);\n// RBAC\nconst Permissions = { admin: ['*'], manager: ['customers:*','readings:*','billing:*'], operator: ['readings:write','customers:read'], viewer: ['*:read'] };\nexport const can = (role, perm) => Permissions[role]?.includes('*') || Permissions[role]?.includes(perm) || Permissions[role]?.some(p => perm.startsWith(p.replace(':*','')));\n",
+        "testStrategy": "Validation:\n- Unit: RBAC can() permutations with Vitest\n- Integration: API auth flows using supabase-js in tests; ensure JWT contains tenant_id; attempt cross-tenant access returns 403\n- Subdomain: start dev on localhost with host header override (e.g., dev.local), verify middleware sets x-tenant and tenant context loads\n- Security: ensure magic link is only for customers with matching email in Customer record (if used)",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Supabase Auth configuration and email templates",
+            "description": "Configure Supabase Auth, SMTP/email templates, and environment variables for multi-tenant flows.",
+            "dependencies": [],
+            "details": "Set SITE_URL, JWT secret/expiry, redirect URLs for magic links; configure SMTP provider and verified sender; create branded email templates (signup, magic link, password reset) with tenant-agnostic copy; enable email confirmation; restrict signups to API only; document required env vars for local/dev/prod; verify auth schema migrations are tracked.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Tenant registration flow (tenant + admin user + metadata)",
+            "description": "Implement the tenant creation pipeline and admin user provisioning with proper metadata.",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Design tenants table (id, name, subdomain, created_by, settings, created_at); build service to validate subdomain uniqueness and reserved words; in register flow: create tenant row first, then supabase.auth.admin.createUser with email, role=admin, email_confirm: true/false per config; store tenant_id and role in app_metadata/user_metadata; seed default tenant settings; handle rollback on any step failure.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "JWT custom claims and Postgres helpers for tenant_id",
+            "description": "Inject tenant_id into JWT or expose via SECURITY DEFINER functions for RLS and server checks.",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Option A: Configure GoTrue JWT hooks to include app_metadata.tenant_id and role in tokens; Option B: Create SECURITY DEFINER functions auth.tenant_id() and auth.role() that select from a profiles/users table by auth.uid(); add a trigger to sync app_metadata on user changes; ensure RLS policies use auth.tenant_id(); document claim structure and fallback behavior.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Next.js API routes: register, login, logout, refresh, magic-link",
+            "description": "Create API endpoints with zod validation and supabase-js integrations for core auth flows.",
+            "dependencies": [
+              "3.1",
+              "3.2",
+              "3.3"
+            ],
+            "details": "Implement POST /api/auth/register to call tenant registration service; POST /api/auth/login using signInWithPassword; POST /api/auth/logout to clear cookies/session; POST /api/auth/refresh to refresh sessions; POST /api/auth/magic-link to send signInWithOtp; return sanitized user and JWT with tenant_id; standardized error responses; rate-limit endpoints; ensure CORS and cookie options are secure.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Subdomain routing middleware",
+            "description": "Add middleware.ts to parse host, derive tenant subdomain, and propagate via headers.",
+            "dependencies": [],
+            "details": "Parse request host to extract subdomain; attach x-tenant-subdomain (and x-tenant) headers; bypass static/asset paths; redirect bare domain to marketing site; support localhost dev with wildcard domains (e.g., *.dev.local) and header overrides; handle invalid/missing subdomains gracefully; add types for next/edge runtime.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Server-side client wrappers and tenant enforcement",
+            "description": "Create server utilities to read session, resolve tenant, and enforce tenant_id matching.",
+            "dependencies": [
+              "3.3",
+              "3.5"
+            ],
+            "details": "Build createServerClient wrapper with cookies; read x-tenant-subdomain header to resolve tenant; fetch session and compare token tenant_id to resolved tenant; return 401 if no session, 403 if mismatch; helper for withAuth(handler, requiredRole/permission?) to centralize checks; ensure RLS uses auth.tenant_id() for DB queries.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "RBAC permissions map and can() utility",
+            "description": "Define roles and permissions and implement the can(role, permission) helper.",
+            "dependencies": [],
+            "details": "Finalize roles: admin, manager, operator, viewer; define permission strings and wildcards as per spec; implement can() with wildcard and prefix matching; export Permissions and can(); add typings and exhaustive tests to be used by guards and UI feature flags; document permission naming conventions.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Route guards (server and client)",
+            "description": "Protect routes using server guards and client-side guards integrating RBAC and tenant context.",
+            "dependencies": [
+              "3.6",
+              "3.7",
+              "3.9"
+            ],
+            "details": "Server: wrap Route Handlers with withAuth and optional permission checks; return 401/403 with consistent JSON shape; Client: HOC/Component Guard to redirect unauthorized users, show 404 for cross-tenant; integrate with Next.js layouts; ensure SSR-safe checks and loading states; hide UI elements based on can().",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Zustand store for user and tenant context",
+            "description": "Provide a client store for session, role, and tenant info with sessionStorage persistence.",
+            "dependencies": [
+              "3.4",
+              "3.5"
+            ],
+            "details": "State: user, role, tenantId, subdomain, accessToken, expiresAt; actions: setSession, clear, refresh; persist to sessionStorage with versioning/migrations; hydrate safely on SSR/CSR boundary; subscribe to auth state changes; sync across tabs via storage events; expose selectors/hooks for guards and UI.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Audit logging for authentication and access events",
+            "description": "Implement audit trail for key auth events with tenant scoping.",
+            "dependencies": [
+              "3.3",
+              "3.4",
+              "3.6"
+            ],
+            "details": "Create table auth_audit_logs (id, tenant_id, user_id, event, ip, user_agent, metadata, created_at); log events: register, login, logout, refresh, magic_link_sent, forbidden_access; write logs in API routes and server wrappers; ensure RLS allows users to see only their tenant logs (or restrict to admins); add retention policy and index strategy.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Test suite: unit and integration",
+            "description": "Add unit tests for RBAC and integration tests for auth flows, subdomain routing, and RLS.",
+            "dependencies": [
+              "3.2",
+              "3.3",
+              "3.4",
+              "3.5",
+              "3.6",
+              "3.7",
+              "3.8",
+              "3.9"
+            ],
+            "details": "Unit: test can() permutations with Vitest; Integration: register/login/logout/refresh/magic-link using supabase-js; assert JWT contains tenant_id; verify cross-tenant access returns 403; middleware sets x-tenant headers; end-to-end happy path for protected routes; use local wildcard domains or host header overrides; CI config and seeded fixtures.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "Security review and hardening",
+            "description": "Conduct a security pass and document hardening actions and backlog.",
+            "dependencies": [
+              "3.1",
+              "3.2",
+              "3.3",
+              "3.4",
+              "3.5",
+              "3.6",
+              "3.7",
+              "3.8",
+              "3.9",
+              "3.10",
+              "3.11"
+            ],
+            "details": "Review: password policy, MFA options, email verification, JWT expiry/refresh rotation, cookie flags (Secure, HttpOnly, SameSite), CSRF strategy for non-GET, CORS origins, rate limiting, account enumeration protections, RLS coverage and least privilege, secrets management, PII in logs, subdomain takeover risks/DNS, tenant isolation checks; produce checklist and prioritized fixes.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Admin Dashboard Shell, Navigation, and Providers",
+        "description": "Create admin SSR shell with navigation (Dashboard, Customers, Readings, Billing, Reports), breadcrumbs, global search, and core providers (QueryClient, Theme, Auth).",
+        "details": "Implementation steps:\n- Layout: app/(admin)/layout.tsx with Header (tenant branding via settings), Sidebar (nav), Main content area; Breadcrumbs in page slots\n- shadcn/ui components: NavigationMenu, Breadcrumb, Table, Dialog, Toast; consistent theme with tenant colors\n- TanStack Query: QueryClientProvider with SSR hydration; configure default staleTime, retry, and error boundary fallback\n- Global search input triggers search modal; implement debounced server action to query customers by name/account_number within tenant\n- Access control HOC or server component guard reading session/role\n- Add marketing app at root domain as static pages (SSG)\nPseudo-code:\n// app/(admin)/layout.tsx\n<QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider>{children}</AuthProvider></ThemeProvider></QueryClientProvider>\n// server tenant branding\nconst { data } = await supabase.from('tenants').select('settings').eq('subdomain', sub).single();\n",
+        "testStrategy": "Validation:\n- Render tests for layout and nav with Testing Library; verify correct links and breadcrumbs\n- Snapshot for shell structure; accessibility checks with jest-axe or RTL a11y assertions\n- Manual: Switch tenant theme colors and verify SSR renders brand correctly",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Admin SSR Layout and Core Providers",
+            "description": "Create app/(admin)/layout.tsx with SSR-wired providers (QueryClient, Theme, Auth) and shell regions (Header, Sidebar, Main).",
+            "dependencies": [],
+            "details": "Implement app/(admin)/layout.tsx that composes QueryClientProvider + Hydrate (TanStack Query), ThemeProvider, and AuthProvider around {children}; configure QueryClient defaults (e.g., staleTime ~5m, retry=2) and error boundary fallback; include shadcn/ui Toast provider; define shell structure with Header, Sidebar, and <main> content slot; ensure de/rehydration works with server-fetched data and cookies.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Access Control Guard for Admin Routes",
+            "description": "Enforce server-side access control for admin routes using session and role checks.",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "Implement a server component guard or middleware for app/(admin) that reads the Supabase session and role; allow roles admin/staff; redirect to /login or render 403 page on failure; expose user and tenant context to children via AuthProvider; add tests for allowed/denied roles.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Tenant Branding Fetch and Theme Injection",
+            "description": "Fetch tenant settings by subdomain and inject dynamic theme variables into the layout.",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "On server, fetch tenant settings via supabase.from('tenants').select('settings').eq('subdomain', sub).single(); map settings (colors, logo URLs, favicon) to CSS variables and ThemeProvider config; apply branding to Header and shadcn/ui theme tokens; handle missing settings with safe defaults; ensure SSR renders branded UI and avoid FOUC.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Header and Sidebar Navigation (shadcn/ui)",
+            "description": "Build header with branding and search trigger, and sidebar navigation for Dashboard, Customers, Readings, Billing, Reports.",
+            "dependencies": [
+              "4.1",
+              "4.3"
+            ],
+            "details": "Use shadcn/ui NavigationMenu, Sheet/Drawer for mobile, Avatar/Menu, and Button components; implement active route highlighting and collapsible sidebar; include user menu (profile, sign out); ensure responsive behavior; integrate tenant colors from theme; wire links to /admin routes; include Toast region.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Breadcrumbs Component and Route Mapping",
+            "description": "Implement breadcrumbs using shadcn/ui Breadcrumb with route-to-label mapping and dynamic params.",
+            "dependencies": [
+              "4.1",
+              "4.4"
+            ],
+            "details": "Create a Breadcrumb component placed under Header or within page slot; implement a util to map pathname segments to human-readable labels (e.g., /admin/customers/[id] -> Customers > {customerName}); allow pages to provide custom crumb labels via export or context; handle loading states for dynamic labels; ensure a11y-compliant nav landmark.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Global Search Modal with Debounced Server Action",
+            "description": "Add a global search modal to search customers by name/account_number within tenant using debounced server action.",
+            "dependencies": [
+              "4.1",
+              "4.2",
+              "4.3",
+              "4.4"
+            ],
+            "details": "Place a search input/button in Header; open Dialog-based modal with input; debounce keystrokes (~300ms) and call a server action or route handler that queries customers (ILIKE on name/account_number) scoped to tenant; show results list with keyboard navigation and loading/empty states; navigate to selected entity; cache recent searches; respect RLS and auth.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Testing: Layout, Navigation, Breadcrumbs, Search",
+            "description": "Add RTL render tests, snapshots, and a11y checks for the admin shell and core UI.",
+            "dependencies": [
+              "4.1",
+              "4.2",
+              "4.3",
+              "4.4",
+              "4.5",
+              "4.6"
+            ],
+            "details": "Set up Jest + React Testing Library with jest-axe; tests: layout renders providers and shell regions; navigation shows correct links and active state; breadcrumbs render correct labels for static and dynamic routes; search modal opens, debounces queries, and navigates on selection; snapshot shell structure; minimal integration test for SSR hydration of QueryClient.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Theming Documentation and Examples",
+            "description": "Document tenant theming model and provide examples for adding/updating branding.",
+            "dependencies": [
+              "4.3"
+            ],
+            "details": "Create docs/admin-theming.md covering theme tokens, CSS variables, and how settings map to visual elements; include examples for changing brand colors/logos and verifying SSR output; note constraints (contrast, accessible color pairs); include code snippets for ThemeProvider usage and adding new shadcn/ui component tokens.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Customer Management: CRUD, Search/Filters, CSV Import, Address Validation",
+        "description": "Deliver full customer CRUD with advanced search, bulk CSV/Excel import, export, auto account number generation, and Google Maps-based address validation.",
+        "details": "Implementation steps:\n- Zod schemas for Customer create/update\n- API routes:\n  - GET /api/customers?status=&q=&page=&limit=\n  - POST /api/customers (server validates tenant_id, generates account number: `${prefix}-${yyyy}${nnnn}` scoped per tenant)\n  - GET/PUT/DELETE /api/customers/:id (soft delete flag)\n  - POST /api/customers/import: parse CSV/Excel (use papaparse/xlsx), stream to temp storage, background batch insert with validation; return job id and progress\n- UI:\n  - Table with pagination, column filters (status, ratePlan, meter type), TanStack Table\n  - Forms built with react-hook-form + zodResolver\n  - Address validation: Google Places Autocomplete for address fields; upon selection, call Places Details or Geocoding API to standardize and store lat/lng; show validation badge\n  - Export: client-side CSV export from current filter or server-side export endpoint\n- Background processing: Next.js route creates a job row (imports table), processes in chunks (100-500 rows) to avoid timeouts; consider Edge Function for larger batches\nPseudo-code:\n// account number generation (transactional)\nBEGIN; SELECT last_number FROM sequences WHERE tenant_id=$1 FOR UPDATE; UPDATE sequences SET last_number=last_number+1 WHERE tenant_id=$1; COMMIT; return `${prefix}-${newNumber.toString().padStart(4,'0')}`;\n// import handler\nfor (row of parsedRows) { validate(rowZod); await supabase.from('customers').insert({...row, tenant_id}); }\n",
+        "testStrategy": "Validation:\n- Unit: zod schemas; account number generator counter under concurrency (simulate with Promise.all)\n- Integration: API tests creating, listing with filters, updating, soft deleting; ensure RLS blocks cross-tenant\n- Import: upload a 1k-row CSV; verify progress and final counts; invalid rows reported\n- Address: mock Google API responses; ensure normalization and error states\n- UI: Playwright flow for create/edit/search/export",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Zod schemas and TypeScript types for Customer and Import",
+            "description": "Define validation schemas and types for customer CRUD, list filters, and import rows.",
+            "dependencies": [],
+            "details": "Create Zod schemas: CustomerBase (name, email, phone, status enum, ratePlanId, meterType enum, address fields, placeId?, lat?, lng?), CustomerCreate, CustomerUpdate (omit immutable fields), CustomerFilterQuery (q, status?, ratePlanId?, meterType?, page, limit, sort?), and ImportRow (header-to-field mapping, optional accountNumber). Include refinements: email format, phone normalization, max lengths, trimming, and lat/lng as numbers. Export inferred TypeScript types and a schema version tag for import compatibility.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Per-tenant account number generator (transactional)",
+            "description": "Implement a robust, concurrent-safe account number generator scoped per tenant.",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Create a service that, within a DB transaction, SELECTs the current last_number FOR UPDATE from a tenant-scoped sequences table, increments, and formats account numbers as `${prefix}-${yyyy}${nnnn}`. Ensure year component reflects server time; pad nnnn to 4 digits; handle missing sequence row with upsert; optionally reset on year change if required. Expose async generateForTenant(tenantId, prefix). Add idempotency guard for retries and log collisions.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "API middleware for auth, tenant scoping, and RBAC",
+            "description": "Add middleware/utilities to enforce tenant_id scoping and role permissions on all customer endpoints.",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Resolve tenant from subdomain/header and verify it matches JWT claims. Implement can() checks: admin/manager can create/update/delete/import/export; viewer read-only; deny cross-tenant access. Inject tenant context on request. Hide soft-deleted rows by default. Normalize error handling (401/403/422/429) and attach request IDs for tracing.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "GET /api/customers with search, filters, pagination",
+            "description": "Implement list endpoint supporting q search, status/ratePlan/meterType filters, sorting, and paging.",
+            "dependencies": [
+              "5.1",
+              "5.3"
+            ],
+            "details": "Parse query via CustomerFilterQuery schema. Search across account_number, name, email. Apply filters (status, ratePlanId, meterType) and soft-delete exclusion. Return items[], page, limit, total, and sort meta. Optimize with indexes; cap limit; default sort by created_at desc. Support includeDeleted=true for admins only.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "POST /api/customers (create) with server-side address normalization",
+            "description": "Create customers with validation, account number generation, and Google-based address standardization.",
+            "dependencies": [
+              "5.1",
+              "5.2",
+              "5.3"
+            ],
+            "details": "Validate payload via zod. Validate tenant_id from context. Generate account number via generator. If placeId present, call Google Places Details API; else geocode freeform address. Persist standardized address fields (street, city, state, postalCode, country) and lat/lng; set validation badge flag. Enforce unique constraints (email per tenant, account_number per tenant) and return 201 with created record.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "GET/PUT/DELETE /api/customers/:id with soft delete",
+            "description": "Implement detail retrieval, update with validation and address normalization, and soft delete/restore.",
+            "dependencies": [
+              "5.5"
+            ],
+            "details": "GET returns customer or 404. PUT validates via CustomerUpdate, reuses address normalization helper from create; prevent changing tenant_id/account_number; update audit fields. DELETE sets soft_deleted=true and deleted_at timestamp; optionally support restore via POST /api/customers/:id/restore. All operations scoped to tenant and RBAC enforced.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "GET /api/customers/export (server-side CSV export)",
+            "description": "Provide a streaming CSV export endpoint honoring the same filters as the list endpoint.",
+            "dependencies": [
+              "5.4",
+              "5.3"
+            ],
+            "details": "Accept the same query params as list; stream rows as CSV with appropriate headers and filename (customers-YYYYMMDD.csv). Support large datasets via cursor/streaming; exclude soft-deleted by default; include admin-only includeDeleted flag. Sanitize fields and escape commas/quotes. Add audit/logging of export requests.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "POST /api/customers/import: upload, parse, and job creation",
+            "description": "Accept CSV/Excel uploads, parse headers, validate rows, and create an import job with queued status.",
+            "dependencies": [
+              "5.1",
+              "5.3"
+            ],
+            "details": "Implement file upload with streaming (busboy/formidable). Validate content-type and size. For .csv use PapaParse; for .xlsx use xlsx; map headers to ImportRow schema; collect basic stats. Create an imports job row (tenant_id, filename, totalRows, status=queued, createdBy). Store temp file or parsed chunk references. Return 202 with jobId.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Background import processor (chunked inserts with validation)",
+            "description": "Process import jobs in chunks, validating each row and inserting customers without timeouts.",
+            "dependencies": [
+              "5.1",
+              "5.2",
+              "5.8"
+            ],
+            "details": "Implement a processor that reads queued jobs, parses rows lazily or from temp storage, validates with zod, enriches addresses via Google if placeId/address present, and inserts in chunks of 100–500 within transactions. Use generator for missing account numbers. Deduplicate by email/account_number per tenant; record per-row errors. Update job progress, successes, failures, and final status (completed/failed/partial). Consider Edge Function for large batches.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Import job status, progress, and error reporting endpoints",
+            "description": "Expose endpoints to poll import job progress and fetch error details; support cancellation.",
+            "dependencies": [
+              "5.8",
+              "5.9"
+            ],
+            "details": "Add GET /api/customers/import/:jobId to return job status, total, processed, successCount, failureCount, startedAt, finishedAt. Add GET /api/customers/import/:jobId/errors with paginated error rows and messages. Optional POST /api/customers/import/:jobId/cancel to set status=cancelled if not yet completed. Enforce tenant scoping and RBAC.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Customers list UI with TanStack Table, filters, and export",
+            "description": "Build the customers table UI with pagination, column filters, global search, and export action.",
+            "dependencies": [
+              "5.4",
+              "5.6",
+              "5.7"
+            ],
+            "details": "Use TanStack Table for server-side pagination and sorting. Add filters for status, ratePlan, meterType; global search box; soft-delete visibility toggle for admins. Row actions: view, edit, soft delete/restore. Include CSV export button calling the export endpoint with current filters. Provide loading skeletons, empty states, and error toasts.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "Customer Create/Edit forms with RHF + zodResolver and Google Places",
+            "description": "Implement forms using react-hook-form with zodResolver and integrate Places Autocomplete with validation badge.",
+            "dependencies": [
+              "5.1",
+              "5.5",
+              "5.6"
+            ],
+            "details": "Build reusable form components tied to Zod schemas. Integrate Google Places Autocomplete on address fields; on selection, fetch Place Details and populate normalized fields and lat/lng; display a \"Validated\" badge when standardized. Handle client-side errors, submission to create/update endpoints, and success UX. Add accessibility and keyboard support.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 13,
+            "title": "Rate limiting, payload size limits, and security hardening",
+            "description": "Protect customer endpoints with rate limits and size guards; secure external API keys and logging.",
+            "dependencies": [
+              "5.3",
+              "5.5",
+              "5.8"
+            ],
+            "details": "Add token-bucket rate limiting per IP+tenant for POST/PUT/DELETE and import endpoints. Enforce JSON body size limits and file upload size/type checks. Validate CSV/Excel structure before processing. Centralize logging of writes/imports with request IDs, and redact PII where appropriate. Configure Google API key restrictions (HTTP referrers/IPs) and secure env management.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 14,
+            "title": "Testing (CRUD, filters, RLS, import, concurrency) and import documentation",
+            "description": "Implement automated tests and provide import templates and docs for users.",
+            "dependencies": [
+              "5.4",
+              "5.5",
+              "5.6",
+              "5.7",
+              "5.8",
+              "5.9",
+              "5.10",
+              "5.11",
+              "5.12"
+            ],
+            "details": "Write unit tests for Zod schemas and account number generator under concurrency (Promise.all). Integration tests for create/list/update/soft delete with filters and RLS isolation (cross-tenant blocked). Import E2E: upload 1k-row CSV, poll progress, verify counts and errors. Tests for address normalization (mock Google APIs). Provide CSV/Excel templates with headers and sample data, plus README covering column definitions, required fields, examples, and troubleshooting.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "PWA Offline Infrastructure: Service Worker, IndexedDB (Dexie), and Sync Manager",
+        "description": "Establish offline-first PWA foundations for field operations with Serwist service worker, Dexie schema for queued readings, and robust background sync.",
+        "details": "Implementation steps:\n- Service worker app/sw.ts using Serwist:\n  - Precache shell assets; runtime caching strategies per resource type\n  - Background sync (via serwist Queue) for POST to /api/readings/sync\n- Dexie DB: define stores readingsQueue (id++, payload, createdAt, retries, photoBlobRef, synced), photos (id, blob)\n- SyncManager lib: batched sync (e.g., 50 at a time), exponential backoff, last-write-wins by readingDate; store syncedAt\n- Connectivity listener: window.addEventListener('online', sync)\n- Register SW in app root; show toast on offline/online events\n- Storage handling: capture photos locally, upload to Supabase Storage during sync, then attach URL to record\nPseudo-code:\nclass SyncManager { async sync() { const items = await db.readingsQueue.orderBy('createdAt').limit(50).toArray(); for (const it of items) { try { const photoUrl = it.photoBlobRef ? await uploadPhoto(it.photoBlobRef) : undefined; await fetch('/api/readings/sync',{method:'POST',body:JSON.stringify({...it.payload, photo: photoUrl})}); await db.readingsQueue.delete(it.id); } catch(e){ await db.readingsQueue.update(it.id,{retries:(it.retries||0)+1}); } } } }\n",
+        "testStrategy": "Validation:\n- Unit: Dexie schema open/CRUD; SyncManager retry/backoff logic\n- Manual/E2E: Simulate offline (DevTools), queue 10 readings with photos, go online, verify server receives; duplicates avoided\n- SW tests: verify registration, cache hit/miss, background sync triggered\n- Security: ensure photos are uploaded to tenant-scoped storage bucket path tenants/{tenantId}/readings/{id}.jpg",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Serwist service worker base and precache manifest",
+            "description": "Create app/sw.ts with Serwist, enable precaching of app shell and core assets.",
+            "dependencies": [],
+            "details": "- Initialize Serwist in app/sw.ts with clientsClaim and skipWaiting\n- Inject precache manifest (workbox-style) for HTML, JS, CSS, icons, manifest.json\n- Offline fallback for navigation requests (app shell)\n- Version caches with a clear naming convention and cleanup outdated caches\n- Acceptance: SW registers, precaches on install, serves shell offline",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Runtime caching strategies per resource",
+            "description": "Define caching strategies for pages, API GETs, images, fonts, and Supabase storage.",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "- HTML/navigation: NetworkFirst with fallback to precached shell\n- Static assets (/_next/static, *.js/css): StaleWhileRevalidate with revisioned URLs\n- Images (app assets): StaleWhileRevalidate with maxEntries/time-based expiration\n- Fonts/icons: CacheFirst with long TTL\n- Supabase Storage (public URLs): StaleWhileRevalidate with cache-busting on version param\n- API GET /api/*: NetworkFirst with short TTL cache\n- POSTs remain NetworkOnly except sync route handled by queue (subtask 3)\n- Acceptance: Cache headers honored, cache hits/misses observable in DevTools",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Background sync queue for POST /api/readings/sync",
+            "description": "Configure Serwist Queue to enqueue failed POSTs and replay with backoff.",
+            "dependencies": [
+              "6.1",
+              "6.5"
+            ],
+            "details": "- Create a Serwist BackgroundSync/Queue named readings-sync-queue\n- Match POST /api/readings/sync requests; serialize body and headers safely\n- Configure retry logic (maxRetentionTime, exponential backoff, jitter)\n- Ensure auth and tenant headers are attached on replay (from shared store, see subtask 5)\n- Deduplicate by idempotency key header to prevent duplicates server-side\n- Acceptance: Offline POSTs queued, replayed automatically when online",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Dexie schema and migrations",
+            "description": "Define IndexedDB stores readingsQueue and photos with indexes and migration path.",
+            "dependencies": [],
+            "details": "- readingsQueue: id++ (PK), payload (object), readingDate (ISO), createdAt (ISO), updatedAt (ISO), retries (int), photoBlobRef (string|number), synced (bool), syncedAt (ISO|null), tenantId (string), idempotencyKey (string)\n- photos: id (string UUID), blob (Blob), createdAt (ISO), size (int), mime (string)\n- Indexes: readingsQueue.by(createdAt), by(readingDate), by(idempotencyKey); photos.by(createdAt)\n- Add Dexie versioning with upgrade callbacks for future fields\n- Acceptance: CRUD ops succeed; version upgrade maintains data",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Auth and tenant context propagation in SW/fetch",
+            "description": "Ensure Supabase JWT and tenant ID are available to SW and fetch calls.",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "- Maintain a lightweight IDB or BroadcastChannel channel for auth state (access token, tenantId)\n- On auth/tenant change in app, postMessage to SW to update cached context\n- Attach Authorization: Bearer <token> and X-Tenant-Id headers in queued/replayed requests\n- Refresh token handling: detect 401 in SW and signal app to refresh\n- Acceptance: Requests from SW include current auth and tenant headers",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "SyncManager core (batching, backoff, LWW, idempotency)",
+            "description": "Implement SyncManager to push Dexie-queued readings in batches with robust retry semantics.",
+            "dependencies": [
+              "6.4",
+              "6.5"
+            ],
+            "details": "- Process up to 50 items per cycle ordered by createdAt\n- Exponential backoff with decorrelated jitter per item; cap max retries\n- Last-write-wins: compare readingDate and an updatedAt field; include updatedAt in payload\n- Idempotency: generate stable idempotencyKey per reading; send as header\n- Concurrency guard to avoid overlapping syncs; persist syncedAt on success, delete item\n- Public API: sync(), schedule(), isSyncing; emits progress events\n- Acceptance: Batches sync reliably; duplicates avoided server-side",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Connectivity listeners and UX toasts",
+            "description": "Wire online/offline detection, manual sync triggers, and user feedback.",
+            "dependencies": [
+              "6.1",
+              "6.6"
+            ],
+            "details": "- window online/offline: show toast banners; trigger SyncManager.sync() on online\n- Register SW in app root; show update available prompt; handle skipWaiting flow\n- Add a visible Sync Now button and a subtle syncing indicator with progress\n- Accessibility: ARIA-live for status updates\n- Acceptance: User sees status changes and can manually trigger sync",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Photo capture and local storage flow",
+            "description": "Implement offline-friendly photo capture and blob persistence in Dexie.",
+            "dependencies": [
+              "6.4"
+            ],
+            "details": "- Capture via input capture or camera API; compress and strip EXIF (privacy)\n- Store Blob in photos store with generated UUID; reference id in readingsQueue.photoBlobRef\n- Manage object URLs safely; enforce size/type constraints\n- Cleanup: remove photo blob after successful remote upload (handled in subtask 9)\n- Acceptance: Photos captured offline persist and are linked to queued readings",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Supabase Storage upload during sync",
+            "description": "Integrate photo uploads into SyncManager and attach resulting URL to payload.",
+            "dependencies": [
+              "6.6",
+              "6.8",
+              "6.5"
+            ],
+            "details": "- For items with photoBlobRef, fetch blob from photos store and upload to Supabase Storage\n- Path convention: tenantId/readings/{idempotencyKey}.jpg; handle duplicate-safe overwrite\n- Use signed or public URLs per security requirements; attach URL to POST body\n- On success: delete photo blob and clear photoBlobRef; on failure: retain and increment retries\n- Acceptance: Photos are uploaded then referenced by URL in synced readings",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Telemetry and logging of sync outcomes",
+            "description": "Add observability for SW, caching, and sync pipeline.",
+            "dependencies": [
+              "6.1",
+              "6.6"
+            ],
+            "details": "- Central logger with levels; optional Sentry hook if available\n- Metrics: counts of queued/synced/failed, retry histogram, durations per batch\n- Persist recent logs in Dexie (ring buffer) and expose a debug UI panel\n- Send batched telemetry to /api/telemetry when online (best effort)\n- Acceptance: Developers can inspect sync/caching behavior via logs and metrics",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Unit and integration tests for Dexie, SyncManager, and SW hooks",
+            "description": "Cover schema, backoff, LWW, idempotency, auth headers, and photo pipeline.",
+            "dependencies": [
+              "6.4",
+              "6.6",
+              "6.9",
+              "6.5"
+            ],
+            "details": "- Vitest: Dexie CRUD and migrations; generate factories for readings\n- SyncManager: simulate network via MSW; test batching, backoff, LWW, idempotency\n- Photo upload: mock Supabase Storage; verify URL attachment and blob cleanup\n- SW-adjacent: test header injection helpers and queue serialization logic\n- Acceptance: All tests pass locally and in CI with meaningful coverage",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "Manual offline E2E checklist",
+            "description": "Define and execute a step-by-step offline/online validation scenario.",
+            "dependencies": [
+              "6.2",
+              "6.3",
+              "6.6",
+              "6.7",
+              "6.8",
+              "6.9",
+              "6.10",
+              "6.11"
+            ],
+            "details": "- Simulate offline in DevTools; create 10 readings with photos; verify queue growth\n- Kill/reload app and confirm persistence; then go online and observe sync progression\n- Verify server receives once per idempotencyKey; no duplicates\n- Confirm background sync triggers without foreground tab\n- Validate caches serve content offline; SW update flow works\n- Verify auth expiration handling and tenant isolation across two tenants\n- Acceptance: All checklist items pass on Chrome Android and iOS Safari",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Meter Reading & Consumption Tracking: UI, API, Validation, Anomaly Detection",
+        "description": "Build reading entry UX (mobile-optimized), bulk grid, server endpoints for readings, consumption calculation, and anomaly detection with flags.",
+        "details": "Implementation steps:\n- API routes:\n  - GET /api/readings?customerId=&dateFrom=&dateTo=&page=...\n  - POST /api/readings: single reading; calculate consumption = reading - previousReading (fetch last confirmed reading); validate non-negative; store metadata (readBy, method, location)\n  - POST /api/readings/bulk: accept array; transactional batches\n  - POST /api/readings/sync: from offline queue; idempotency-key header to avoid duplicates\n- Photo storage: Supabase Storage upload (public=false); store signed URL or path; generate signed URL on demand\n- Validation Rules Engine: configurable per tenant (thresholds, min/max delta%). If delta > highThreshold -> anomalyFlag='high', < lowThreshold 'low', negative -> 'negative'\n- UI:\n  - Mobile form with account lookup, previous reading display, numeric keypad, camera capture (MediaDevices.getUserMedia)\n  - Bulk grid for office entry; paste from clipboard, inline validation\n  - Reading history view with charts per customer\n- Realtime: publish events to tenant:{id}:readings channel (Supabase Realtime) after insert\nPseudo-code:\n// compute consumption\nconst last = await supabase.from('meter_readings').select('reading').eq('customer_id', cid).order('reading_date', {ascending:false}).limit(1).single();\nconst previous = last?.reading ?? 0; const consumption = current - previous;\n// anomaly\nif (consumption < 0) flag='negative'; else if (consumption > rules.high) flag='high'; else if (consumption < rules.low) flag='low';\n",
+        "testStrategy": "Validation:\n- Unit: anomaly detection thresholds; idempotency handling (same payload twice -> one record)\n- Integration: create sequence of readings and verify consumption; ensure RLS tenant isolation\n- UI: Playwright mobile emulation; take photo, save offline, sync flow validation (depends on Task 6 infra present in app)\n- Realtime: subscribe and assert event upon insert in dev",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Database schema, indexes, and RLS for readings and rules",
+            "description": "Create core tables, indexes, and row-level security for multi-tenant meter readings and validation rules.",
+            "dependencies": [],
+            "details": "- Tables:\n  - meter_readings(id, tenant_id, customer_id, reading_value, reading_date, previous_reading_value, consumption, anomaly_flag, photo_path, metadata(jsonb: readBy, method, location), source, created_at, created_by)\n  - validation_rules(id, tenant_id, low_threshold, high_threshold, min_delta_pct, max_delta_pct, effective_from, effective_to)\n  - idempotency_keys(id, tenant_id, key, request_path, body_hash, created_at, expires_at)\n- Indexes: (tenant_id, customer_id, reading_date desc), (tenant_id, reading_date), (tenant_id, idempotency_keys.key)\n- Constraints: non-negative reading_value, unique(tenant_id, customer_id, reading_date) if policy requires\n- Storage: Supabase Storage bucket 'reading-photos' (public=false)\n- RLS: enable on tables; policies restricting access to rows with tenant_id = auth.tenant_id(); role-based insert/update permissions (meter_reader, office_clerk, admin)",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Previous reading lookup and consumption calculation service",
+            "description": "Implement shared service to fetch last confirmed reading and compute consumption deterministically.",
+            "dependencies": [
+              "7.1"
+            ],
+            "details": "- Query last reading for (tenant_id, customer_id) prior to current reading_date (exclude current row)\n- Handle out-of-order entries by ordering reading_date desc, then created_at desc\n- Compute consumption = current_reading - previous_reading_value; normalize precision/scale\n- Return {previous_value, previous_date, consumption} with null-safe defaults\n- Surface domain errors: negative consumption, large deltas (for later rules engine)",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Per-tenant anomaly rules engine",
+            "description": "Create configurable rules evaluation for anomaly flags based on thresholds and delta percentages.",
+            "dependencies": [
+              "7.1"
+            ],
+            "details": "- Load active rules for tenant from validation_rules (fallback to defaults)\n- Evaluate flags in precedence: negative > high > low; else null\n- Support absolute thresholds (low/high) and relative delta% vs previous_value\n- Return {flag, reasons[]} for auditing; serialize into meter_readings.anomaly_flag and metadata.reasons\n- Provide admin-safe defaults when rules missing",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Idempotency and de-duplication policy and store",
+            "description": "Define and implement idempotency semantics and duplicate detection across ingestion paths.",
+            "dependencies": [
+              "7.1"
+            ],
+            "details": "- Header: Idempotency-Key (UUID/string), scope = tenant_id + request_path\n- Persist (tenant_id, key, body_hash) in idempotency_keys with TTL (e.g., 72h)\n- On key reuse with identical body_hash: return previously created result (200 with existing id) without re-inserting\n- On key reuse with different body_hash: 409 Conflict\n- Duplicate reading detection: reject or mark duplicate when same (tenant_id, customer_id, reading_date, reading_value) seen within window; policy: respond 200 with existing record and metadata.duplicate=true",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "API: POST /api/readings (single create)",
+            "description": "Create single-reading endpoint with validation, consumption calc, anomaly flagging, metadata, and realtime emit.",
+            "dependencies": [
+              "7.1",
+              "7.2",
+              "7.3",
+              "7.14"
+            ],
+            "details": "- Input: {customerId, reading, readingDate, metadata:{readBy, method, location}, photoToken/path?}\n- Steps: lookup previous (#7.2) -> compute consumption -> validate non-negative -> evaluate rules (#7.3) -> insert row\n- Attach metadata, source='single'\n- Optionally attach photo_path if provided\n- Emit realtime event to tenant channel (#7.14)\n- Responses: 201 with record; 400 on validation; consistent error shape",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "API: POST /api/readings/bulk (transactional batches)",
+            "description": "Accept array payload and process in transactional batches with partial failure reporting.",
+            "dependencies": [
+              "7.1",
+              "7.2",
+              "7.3",
+              "7.14"
+            ],
+            "details": "- Input: [{customerId, reading, readingDate, metadata, photoPath?}, ...]\n- Chunk into N-sized batches (configurable); use DB transactions per batch\n- For each item: compute previous/consumption (#7.2), apply rules (#7.3), insert\n- Partial failures: return per-item status [{index, ok, id?, error?}] and overall summary\n- Enforce payload limits (size, items)\n- Emit realtime events for successful inserts (#7.14)",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "API: POST /api/readings/sync (offline queue + idempotency)",
+            "description": "Process offline-synced readings with at-most-once semantics using Idempotency-Key.",
+            "dependencies": [
+              "7.1",
+              "7.2",
+              "7.3",
+              "7.4",
+              "7.14"
+            ],
+            "details": "- Input: {clientBatchId, items:[{clientId, customerId, reading, readingDate, metadata, photoPath?}]}\n- Require Idempotency-Key per request; dedupe via #7.4\n- Map clientId to server id in response for reconciliation\n- Handle retries safely (no duplicate rows)\n- Emit realtime events after confirmed inserts (#7.14)\n- Responses: {clientBatchId, results:[{clientId, ok, id?, error?}]}",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Readings query API and customer history view",
+            "description": "Build GET endpoint and UI charts for per-customer history with realtime updates.",
+            "dependencies": [
+              "7.1",
+              "7.14"
+            ],
+            "details": "- GET /api/readings?customerId=&dateFrom=&dateTo=&page=... with pagination (cursor or page+pageSize)\n- Sort by reading_date desc; filter by tenant\n- Response includes consumption and anomaly_flag\n- History UI: chart readings/consumption over time (e.g., Recharts), date range selector, empty/loading states\n- Subscribe to tenant:{id}:readings to live-update current customer view",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Mobile-optimized entry form with photo capture and offline queue",
+            "description": "Implement responsive entry UX with lookup, previous display, keypad, camera, secure photo upload, and offline sync.",
+            "dependencies": [
+              "7.5",
+              "7.7"
+            ],
+            "details": "- Customer lookup with debounce; show last reading and date\n- Numeric keypad for fast entry; validation hints (negative, low/high warnings)\n- Camera capture via MediaDevices.getUserMedia; store photo locally until upload\n- Photo upload: to Supabase Storage (bucket=reading-photos, public=false), path tenant/customer/date/uuid; handle signed URL generation on-demand for previews\n- Offline: queue entries in IndexedDB (Dexie), retry sync via /api/readings/sync with Idempotency-Key\n- Accessibility and mobile ergonomics (large tap targets, minimal typing)",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Bulk grid UI with paste and inline validation",
+            "description": "Create office data-entry grid supporting clipboard paste, per-cell validation, and submission to bulk API.",
+            "dependencies": [
+              "7.6"
+            ],
+            "details": "- Grid with columns: Customer, Reading, Date, Anomaly, Notes\n- Paste from spreadsheet; parse and normalize\n- Inline validation: non-negative, date format, highlight anomalies using same rules messaging\n- Preview diff vs last reading; show computed consumption\n- Submit to /api/readings/bulk; render partial failure results with actionable fixes/export",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Unit tests: anomaly evaluation, consumption, and idempotency",
+            "description": "Write unit tests for rules engine, consumption math, and idempotency behavior.",
+            "dependencies": [
+              "7.3",
+              "7.2",
+              "7.4",
+              "7.5",
+              "7.7"
+            ],
+            "details": "- Anomaly cases: negative, low, high, boundaries, precedence\n- Consumption: out-of-order previous lookup, precision/rounding, zero-previous edge\n- Idempotency: same key+payload returns same result; key collision with different payload -> 409; duplicate reading detection policy\n- Use fixtures and property-based tests for ranges",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "Integration tests: sequences, RLS, and sync flow",
+            "description": "End-to-end tests for reading sequences, tenant isolation, and offline-to-sync lifecycle.",
+            "dependencies": [
+              "7.1",
+              "7.2",
+              "7.5",
+              "7.6",
+              "7.7",
+              "7.8"
+            ],
+            "details": "- Insert sequential readings; verify consumption progression and anomaly flags\n- Cross-tenant access attempts are denied via RLS\n- Bulk upload with mixed good/bad rows; verify partial failure report correctness\n- Offline queue -> sync endpoint with retries; assert idempotent results and mapping of clientId to server id\n- Realtime: verify UI updates on new reading insert",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 13,
+            "title": "Monitoring and alerting for anomaly spikes",
+            "description": "Add metrics and alerts when anomaly rates exceed thresholds per tenant.",
+            "dependencies": [
+              "7.3",
+              "7.14"
+            ],
+            "details": "- Aggregate anomalies per tenant per interval (SQL or server job)\n- Define baselines and alert thresholds (e.g., >X% high flags over N readings)\n- Emit alerts via email/Slack webhook; include recent samples\n- Dashboard widgets for anomaly counts and trends",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 14,
+            "title": "Realtime publish infrastructure and client subscriptions",
+            "description": "Implement unified event emission and client subscription to tenant:{id}:readings.",
+            "dependencies": [
+              "7.1"
+            ],
+            "details": "- Standardize message schema: {type:'reading.insert', tenantId, customerId, readingId, readingDate, consumption, anomaly}\n- Server emitter utility using Supabase Realtime; ensure called by insert paths\n- Option: DB-level Realtime (CDC) fallback/validation\n- Client: subscribe/unsubscribe lifecycle helpers; handle dedup and optimistic updates",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Automated Billing & Invoicing Engine with PDFs and Email Delivery",
+        "description": "Implement rate configuration, monthly invoice generation (batch via Supabase Edge Function + cron), PDF rendering with branding, email delivery using Resend, and overdue reminders.",
+        "details": "Implementation steps:\n- Data model: rate_plans table and tenant_rate_rules (tiered, seasonal). Minimal MVP: tiered by consumption blocks with per-unit rates and tax%\n- Invoice numbering: per-tenant sequence table invoice_sequences(tenant_id, last_number)\n- Edge Function billing/generate_invoices:\n  - For each active customer, fetch readings in period, sum consumption\n  - Apply rate rules -> line items, totals; create invoice rows with status='sent'\n  - Store PDF path after rendering via internal API or directly in function\n- Scheduling: Supabase Scheduled Triggers (cron) to run monthly based on tenant.settings.billingCycle and timezone; store last_run per tenant\n- PDF: React PDF template with logo/colors from tenant.settings; upload to Supabase Storage at tenants/{tenantId}/invoices/{invoiceNumber}.pdf\n- Email: Resend transactional email with invoice PDF link or attachment; POST /api/invoices/:id/send endpoint for manual resend\n- API endpoints:\n  - POST /api/invoices/generate (manual trigger for testing)\n  - GET /api/invoices/:id and /:id/pdf (signed URL)\n- Overdue reminders: scheduled daily function scanning invoices status='overdue' and daysPastDue > N, send reminder\nPseudo-code:\n// rate calc\nfunction calcBill(consumption, rules){ let rem=consumption,total=0; for (const tier of rules.tiers){ const used=Math.min(rem, tier.upTo - (tier.from||0)); total += used * tier.price; rem -= used; if (rem<=0) break; } const tax = total*rules.taxRate; return {subtotal: total, tax, total: total+tax}; }\n",
+        "testStrategy": "Validation:\n- Unit: rate calculation across tier boundaries; rounding rules\n- Integration: seed readings for a month; run function; verify invoices created with correct totals and PDFs stored\n- Email: use Resend test mode; assert email payload; link opens PDF (signed URL)\n- Scheduling: simulate cron invoke with supabase functions serve; confirm idempotency (no duplicate invoices for same period)\n- Security: ensure PDFs are private with signed URL access and RLS on invoices",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design schema for rate_plans and tenant_rate_rules (tiers, seasonal)",
+            "description": "Create tenant-scoped rate configuration supporting tiered consumption blocks and tax%.",
+            "dependencies": [],
+            "details": "Define tables: rate_plans(id, tenant_id, name, currency, tax_rate, active, effective_from, effective_to, created_at). Define rate_tiers(id, rate_plan_id, tier_index, from_qty, up_to_qty, price_per_unit). Optional seasonal windows: rate_seasons(id, rate_plan_id, month_from, month_to). Add RLS policies by tenant_id. Add constraints: price_per_unit >= 0, tax_rate between 0 and 1, non-overlapping tiers. Indexes on tenant_id and (rate_plan_id, tier_index). Seed an MVP plan for testing.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Invoice numbering: invoice_sequences table and locking",
+            "description": "Implement per-tenant invoice sequence with safe concurrent increment.",
+            "dependencies": [],
+            "details": "Create invoice_sequences(tenant_id PK, last_number INT NOT NULL DEFAULT 0, updated_at). Write a Postgres function next_invoice_number(p_tenant_id) that: starts a transaction, SELECT ... FOR UPDATE on invoice_sequences, inserts row if missing, increments last_number, returns next formatted number (e.g., {YYYY}-{NNNN}). Consider advisory locks per tenant to avoid deadlocks. Add tests for concurrent increments.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Currency, rounding, and tax rules library",
+            "description": "Provide precise decimal math, rounding to currency minor units, and tax calculation helpers.",
+            "dependencies": [],
+            "details": "Introduce a decimal/Big library in Edge Functions or rely on Postgres NUMERIC for math. Implement helpers: roundMoney(value, currency), calcTax(subtotal, taxRate, mode=inclusive|exclusive), sumLineItems with safe precision. Store currency at rate_plan level and default from tenant.settings. Define rounding strategy: half-up to 2 decimals (configurable).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Rate calculation module (tiers → line items, subtotal, tax, total)",
+            "description": "Implement calcBill(consumption, rules) using tiered pricing and integrate rounding/tax rules.",
+            "dependencies": [
+              "8.1",
+              "8.3"
+            ],
+            "details": "Implement calcBill(consumption, rules): iterate tiers, allocate usage per tier, compute charges, compute tax via library from subtask 3, return {lineItems:[{desc, qty, unitPrice, amount}], subtotal, tax, total, currency}. Handle edge cases: zero usage, partial tiers, consumption beyond last tier (cap or last-tier open-ended), seasonal plan selection by period. Emit deterministic outputs for idempotency.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Idempotency for tenant-period runs and per-customer invoice writes",
+            "description": "Guarantee safe re-runs without duplicate invoices via keys and run bookkeeping.",
+            "dependencies": [],
+            "details": "Create billing_runs(id, tenant_id, period_start, period_end, input_hash, status, started_at, finished_at, error, UNIQUE(tenant_id, period_start, period_end)). For each customer, use UNIQUE(tenant_id, customer_id, period_start, period_end) on invoices to prevent duplicates. Generate idempotency_key = hash(tenant_id + period + plan_version). On retry, resume remaining customers. Store per-tenant last_period_billed to add guardrails.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Edge Function billing/generate_invoices implementation",
+            "description": "Batch generate invoices: aggregate readings, compute charges, assign numbers, persist rows, and store PDF path placeholder.",
+            "dependencies": [
+              "8.1",
+              "8.2",
+              "8.3",
+              "8.4",
+              "8.5"
+            ],
+            "details": "Create Supabase Edge Function billing/generate_invoices. Steps per tenant: determine billing window from input or tenant.settings.billingCycle/timezone; acquire/run record in billing_runs (idempotent); fetch active customers; aggregate readings in window; fetch applicable rate_plan; use calcBill to compute totals; call next_invoice_number; insert invoices(id, tenant_id, customer_id, invoice_number, period_start, period_end, currency, subtotal, tax, total, status='sent', due_date, pdf_path NULL); insert invoice_line_items; commit per-customer with savepoints to allow partial success. Return summary and errors.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Scheduling via Supabase cron and last_run bookkeeping",
+            "description": "Configure monthly schedule per tenant with timezone; track last_run to avoid duplicates.",
+            "dependencies": [
+              "8.6",
+              "8.5"
+            ],
+            "details": "Use Supabase Scheduled Triggers to invoke billing/generate_invoices daily, and within the function select tenants whose today matches tenant.settings.billingCycle (day-of-month) and timezone-local midnight. Maintain tenants_billing_state(tenant_id, last_run_at, last_period_start, last_period_end). Skip if period already processed (idempotency key). Provide an admin override to force-run.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "PDF rendering with React PDF and Storage upload",
+            "description": "Render branded invoice PDFs and upload to Supabase Storage at a deterministic path.",
+            "dependencies": [
+              "8.6"
+            ],
+            "details": "Build React PDF template reading tenant.settings (logo URL, colors, address). Include invoice metadata, line items, totals, tax, due date, and payment instructions. Generate PDF buffer within Edge Function or via internal API. Upload to Storage path tenants/{tenantId}/invoices/{invoiceNumber}.pdf, set content-type application/pdf, and store pdf_path on invoice. Generate signed URL on demand, not persisted permanently.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Email delivery via Resend with link/attachment and resend endpoint",
+            "description": "Integrate Resend to email invoices; support both attachment and signed link; enable manual resend.",
+            "dependencies": [
+              "8.8",
+              "8.6"
+            ],
+            "details": "Create mailer util using Resend API. Compose tenant-branded email template with invoice summary and CTA. Option A: include signed URL link to PDF; Option B: attach PDF (respect size limits). Store email logs in invoice_emails(invoice_id, message_id, sent_at, to, status, error). Implement POST /api/invoices/:id/send to resend an existing invoice email, with auth and tenant checks.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "API: POST /api/invoices/generate (manual trigger)",
+            "description": "Endpoint to manually trigger invoice generation for a tenant/period for testing or re-runs.",
+            "dependencies": [
+              "8.6",
+              "8.8",
+              "8.9",
+              "8.5"
+            ],
+            "details": "Implement POST /api/invoices/generate with body {tenantId, periodStart, periodEnd, dryRun?:bool, sendEmails?:bool}. Validate auth, RBAC, and tenant scope. For dryRun, compute charges without writing invoices; for normal run, call the Edge Function or internal service and optionally send emails. Return a JSON summary: counts, totals, errors, and run id.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "API: GET /api/invoices/:id and /api/invoices/:id/pdf (signed URL)",
+            "description": "Securely fetch invoice JSON and on-demand signed PDF URL.",
+            "dependencies": [
+              "8.8",
+              "8.6"
+            ],
+            "details": "Implement GET /api/invoices/:id to return invoice details, line items, customer, and pdf_path if present (no public URL). Implement GET /api/invoices/:id/pdf to generate a short-lived signed URL from Storage and redirect or return JSON {url, expiresAt}. Enforce auth and tenant isolation via RLS and server-side checks.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "Robust error handling, retries, and partial failure strategy",
+            "description": "Add retries for transient failures and record partial successes for diagnostics.",
+            "dependencies": [
+              "8.6",
+              "8.8",
+              "8.9",
+              "8.7"
+            ],
+            "details": "Wrap external calls (Storage, Resend) with exponential backoff and max attempts. Use per-customer transactions with savepoints. Mark invoice status='error' when persistence succeeds but email/PDF fails; include error message. Extend billing_runs with counters and error details; implement a dead-letter queue table for failed emails to be retried by a separate job.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 13,
+            "title": "Overdue detection job and reminder emails",
+            "description": "Daily job to mark overdue invoices and send reminder emails based on days past due.",
+            "dependencies": [
+              "8.6",
+              "8.9"
+            ],
+            "details": "Create Edge Function billing/overdue_scan. Query invoices where due_date < now AT TIME ZONE tenant TZ and status IN ('sent','overdue'), compute daysPastDue, update status='overdue', and send reminders at configured intervals (e.g., 7, 14, 30 days). Track reminder_count and last_reminded_at on invoices to throttle. Use Resend mailer and same branding.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 14,
+            "title": "Auditing and reconciliation reports",
+            "description": "Provide visibility into runs, totals, and data integrity for finance review.",
+            "dependencies": [
+              "8.6",
+              "8.9"
+            ],
+            "details": "Create audit views: v_billing_runs_summary and v_invoices_summary per tenant with totals, taxes, counts, and anomalies (e.g., zero-usage invoices). Export CSV endpoint for a period. Add reconciliation checks: readings sum vs billed qty, missing PDFs, unsent emails. Provide admin UI endpoints to fetch these summaries.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 15,
+            "title": "Unit tests for rate calculation and rounding",
+            "description": "Validate tier boundaries, tax application, and currency rounding behavior.",
+            "dependencies": [
+              "8.4",
+              "8.3"
+            ],
+            "details": "Write tests covering: exact tier edges, partial tiers, multi-tier overflow, zero consumption, high consumption, tax inclusive vs exclusive (if supported), and monetary rounding (half-up). Include randomized property tests to catch precision drift. Snapshot expected line items.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 16,
+            "title": "End-to-end test for monthly billing run",
+            "description": "Seed data and verify full pipeline: generate invoices, store PDFs, send emails, and expose endpoints.",
+            "dependencies": [
+              "8.6",
+              "8.7",
+              "8.8",
+              "8.9",
+              "8.10",
+              "8.11",
+              "8.13",
+              "8.12"
+            ],
+            "details": "Seed tenants, customers, readings for a month, and a rate plan. Trigger POST /api/invoices/generate or scheduled job. Assert invoices created with correct totals/status, PDFs exist in Storage, GET /api/invoices/:id/pdf returns a working signed URL, and Resend is called (test mode) with expected payload. Simulate overdue path and confirm reminder email scheduling.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Stripe Payments: Checkout, Webhooks, Reconciliation, and Receipts",
+        "description": "Enable online payments via Stripe (cards, ACH, wallets), reconcile to invoices, handle failures/refunds, and send payment receipts.",
+        "details": "Implementation steps:\n- API:\n  - POST /api/payments/session: create Stripe Checkout Session; include invoiceId, tenantId in metadata; amount from invoice.total; success/cancel URLs to customer portal or admin\n  - POST /api/payments/webhook: verify signature; handle checkout.session.completed, payment_intent.succeeded/failed, charge.refunded; update invoices.status and payments history table; publish realtime event tenant:{id}:payments\n  - GET /api/payments/history?customerId=...\n- Recurring payments: allow save_payment_method in Checkout; set up subscription only if productized later; MVP supports in-app recurring by reusing payment method set as default\n- Receipts: on success, send Resend email with payment details and PDF invoice link\n- UI: Payment modal on invoice page; show Stripe Elements for Billing Portal or redirect to Checkout\n- Data: payments table capturing amount, date, method, transactionId, invoice_id, tenant_id\nPseudo-code:\n// create session\nconst session = await stripe.checkout.sessions.create({ mode:'payment', customer_email: customer.email, currency: tenant.settings.currency, line_items:[{price_data:{currency, product_data:{name:`Invoice ${invoice.invoice_number}`}, unit_amount: Math.round(invoice.total*100)}, quantity:1}], metadata:{invoiceId: invoice.id, tenantId: tenant.id}, success_url:`https://${tenant.subdomain}.flowtrack.app/billing/${invoice.id}?paid=1`, cancel_url:`https://${tenant.subdomain}.flowtrack.app/billing/${invoice.id}` });\n// webhook\nswitch(event.type){ case 'checkout.session.completed': /* mark paid */ break; case 'charge.refunded': /* update adjustments */ break; }\n",
+        "testStrategy": "Validation:\n- Stripe CLI: stripe listen --forward-to localhost:3000/api/payments/webhook; simulate events\n- Integration: create invoice -> start checkout -> complete test payment -> verify invoice status='paid' and payment history record\n- Security: signature verification; ensure metadata tenantId matches invoice.tenant_id; handle replay protection via idempotency keys\n- Failure paths: simulate failed payments and refunds; assert state transitions and notifications",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Database: Payments Table and Relations",
+            "description": "Design and migrate the payments data model and its links to invoices and tenants.",
+            "dependencies": [],
+            "details": "Create payments table with columns: id (uuid pk), tenant_id (fk), invoice_id (fk), customer_id (fk, nullable), amount_cents (int), currency (text), method (text), transaction_id (text), stripe_payment_intent_id (text), stripe_charge_id (text), status (enum: pending|succeeded|failed|refunded|partial_refund), received_at (timestamptz), metadata (jsonb), created_at/updated_at; add unique indexes on (tenant_id, transaction_id) and (tenant_id, stripe_payment_intent_id); index invoice_id and tenant_id; ensure FKs to invoices and tenants; align with existing RLS/tenant isolation policies; prepare for partial refunds via negative adjustments in payments.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "API Guardrails: Tenant and Invoice Ownership Verification",
+            "description": "Enforce tenant and customer ownership checks and invoice state validation across payment APIs.",
+            "dependencies": [
+              "9.1"
+            ],
+            "details": "For session creation and history endpoints, verify authenticated tenant matches invoice.tenant_id and (if customer context) invoice.customer_id; disallow paying invoices not in open/past_due status or with zero/negative totals; validate currency consistency; implement basic rate limiting, input schema validation (zod), and audit logging; prevent duplicate payments by checking existing succeeded payments for the invoice.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "API: Create Stripe Checkout Session and Payments History",
+            "description": "Implement POST /api/payments/session and GET /api/payments/history endpoints.",
+            "dependencies": [
+              "9.1",
+              "9.2"
+            ],
+            "details": "POST /api/payments/session: load invoice and tenant; build stripe.checkout.sessions.create with mode=payment, customer_email, currency=tenant.settings.currency, line_items with price_data.unit_amount=Math.round(invoice.total*100), quantity=1; metadata includes invoiceId and tenantId; success_url and cancel_url to customer/admin billing pages including ?paid=1 on success; enable save_payment_method where allowed; return session.id and session.url. GET /api/payments/history?customerId=...: list payments for tenant (and optional customer) with pagination and filtering.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "API: Webhook Endpoint with Signature Verification and Idempotency",
+            "description": "Create POST /api/payments/webhook with secure signature verification and event deduplication.",
+            "dependencies": [
+              "9.1"
+            ],
+            "details": "Accept raw body, read Stripe-Signature header, verify using endpoint secret from env; reject on verification failure; ensure test vs live mode aligns with environment; implement idempotency by persisting processed event.id in a stripe_event_log table with status and error fields; short-circuit if already processed; return 2xx quickly; include robust parsing and structured logging.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Webhook Event Handlers: Success, Failure, Refund Reconciliation",
+            "description": "Handle checkout.session.completed, payment_intent.succeeded/failed, and charge.refunded to update invoices and payments.",
+            "dependencies": [
+              "9.4",
+              "9.1"
+            ],
+            "details": "Switch on event.type; use metadata (invoiceId, tenantId) or lookups via payment_intent to resolve entities; in a DB transaction upsert payments rows and transition invoice status: mark paid on success, keep open on failure, and record refunds as negative payments or set status refunded/partial_refund; ensure concurrency safety and idempotency; publish realtime event tenant:{id}:payments for UI updates; record errors in event log with retry markers.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Receipts: Resend Email on Successful Payment",
+            "description": "Send branded email receipts with PDF invoice link after payment success.",
+            "dependencies": [
+              "9.5"
+            ],
+            "details": "On successful payment, trigger Resend email to customer_email with amount, currency, method last4/brand, date, invoice number, and link to PDF invoice; include tenant branding; ensure idempotency by checking payments.receipt_sent_at or message_id before sending; capture Resend message ID and delivery status; configurable BCC to tenant billing admin.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "UI: Payment Modal and Checkout Redirect/Elements",
+            "description": "Build invoice payment modal to initiate Checkout and show payment status/history.",
+            "dependencies": [
+              "9.3",
+              "9.5"
+            ],
+            "details": "On invoice page, show Pay button launching modal; call POST /api/payments/session and redirect to session.url; handle return with ?paid=1 to refresh invoice and show success toast; display payments history from GET /api/payments/history and listen to tenant:{id}:payments realtime events; optionally surface Stripe Elements or link to Billing Portal for saved methods (MVP may use Checkout-only).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Payment Methods: ACH and Wallet Enablement Configuration",
+            "description": "Enable cards, ACH, and wallets for Checkout and configure required domains/settings.",
+            "dependencies": [
+              "9.3"
+            ],
+            "details": "Configure Checkout to allow payment_method_types: card, us_bank_account, link (and wallets via automatic); verify Apple Pay/Google Pay domain in Stripe; document/test ACH micro-deposits and bank debits settlement timelines; ensure currency eligibility; expose tenant-level toggles for allowed methods if needed; update session creation to honor enabled methods.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Reliability: Retry, Idempotency Keys, and Error Handling Policies",
+            "description": "Define and implement robust retry strategies and idempotency for API and webhook flows.",
+            "dependencies": [
+              "9.3",
+              "9.4",
+              "9.5"
+            ],
+            "details": "Use Stripe idempotency keys for session creation keyed by (invoice_id, attempt); classify retryable vs non-retryable errors; apply exponential backoff with jitter for Stripe API calls; handle webhook retries idempotently via event log; create a dead-letter table for failed webhook processing beyond N attempts; add structured logs and alerts/metrics for failures and latency.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Dev Tooling: Stripe CLI Local Test Harness",
+            "description": "Set up Stripe CLI scripts to forward webhooks and trigger test events locally.",
+            "dependencies": [
+              "9.3",
+              "9.4"
+            ],
+            "details": "Add npm scripts: stripe listen --forward-to localhost:3000/api/payments/webhook; provide .env.sample for STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET; document stripe trigger commands for checkout.session.completed, payment_intent.succeeded/failed, and charge.refunded; include example payloads and logs; support ngrok/dev tunnel if needed.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Tests: Integration Scenarios for Payments, Failures, Refunds",
+            "description": "Author integration tests covering end-to-end payment flows and edge cases.",
+            "dependencies": [
+              "9.10",
+              "9.3",
+              "9.4",
+              "9.5",
+              "9.6"
+            ],
+            "details": "Happy path: create invoice, start Checkout, simulate success via Stripe CLI, verify invoice status=paid, payments row inserted, receipt sent; Failure path: simulate payment_intent.failed, verify invoice remains open and payment status=failed; Refund path: trigger charge.refunded, verify refund recorded and invoice balance updated; test tenant/customer guardrails and idempotency; include teardown and data isolation.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "Docs: Reconciliation, Refunds, and Operational Runbook",
+            "description": "Produce documentation for finance ops, developers, and support.",
+            "dependencies": [
+              "9.11"
+            ],
+            "details": "Explain mapping between Stripe objects and internal invoice/payment states; outline reconciliation steps and queries; refund procedures (Stripe Dashboard vs in-app) and how webhooks sync state; ACH-specific timelines and caveats; environment setup, webhook endpoint configuration, Apple Pay domain verification; security notes (signature verification, tenant isolation); MVP recurring behavior and limitations.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Analytics Dashboard and Reporting (Realtime + Exports)",
+        "description": "Build executive dashboard with Recharts visualizations, realtime updates via Supabase subscriptions, and exportable reports (PDF/Excel).",
+        "details": "Implementation steps:\n- API endpoints:\n  - GET /api/analytics/dashboard: totals (MRR proxy from invoices, AR, paid rate), consumption trend (per period), payment status breakdown, anomalies count\n  - GET /api/analytics/revenue?range=...; GET /api/analytics/consumption?granularity=...\n- Realtime: subscribe to tenant:{id}:payments and tenant:{id}:readings to update widgets without refresh\n- UI: Recharts Area, Bar, Pie; date range pickers; loading states using skeletons\n- Exports: PDF via React PDF templates for dashboard snapshot; Excel/CSV via server generated files (xlsx) for detailed reports\n- Performance: pre-aggregate views or materialized views for heavy queries (e.g., monthly_revenue_mv); refresh on invoice changes\nPseudo-code:\n// subscription\nconst channel = supabase.channel(`tenant:${tenantId}:payments`).on('broadcast', {event:'update'}, (p)=>queryClient.invalidateQueries(['dashboard'])).subscribe();\n// query pattern\nconst { data } = await supabase.rpc('dashboard_metrics', { tenant_id: tenantId, from, to });\n",
+        "testStrategy": "Validation:\n- Unit: aggregation functions with sample data\n- Integration: seed invoices/payments/readings; verify charts render and numbers match SQL\n- Realtime: insert a payment and reading; assert UI updates within seconds\n- Export: generate PDF and Excel; validate file opens and totals are correct\n- Performance: EXPLAIN ANALYZE on dashboard queries; ensure indexes used and MV refresh completes within target time",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define analytics metrics and SQL/RPC contracts",
+            "description": "Specify formulas, sources, and result shapes for dashboard metrics and series.",
+            "dependencies": [],
+            "details": "- Metrics: MRR proxy from invoices (sum of recurring invoice amounts for period), Accounts Receivable (open invoice balance), Paid rate (paid invoices/total), Consumption trend (sum usage per period), Payment status breakdown (paid/partial/unpaid counts and amounts), Anomalies count (from readings flags or anomalies table).\n- Standardize time zone handling (UTC storage, tenant-local display) and period granularity (day/week/month).\n- RPCs: dashboard_metrics(tenant_id uuid, from date, to date) returns totals and small breakdown arrays; revenue_series(tenant_id uuid, from date, to date, granularity text) returns [{period, amount}]; consumption_series(tenant_id uuid, from date, to date, granularity text) returns [{period, consumption}].\n- Document response keys used by UI and exports; define default ranges.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Pre-aggregations and materialized views with refresh strategy",
+            "description": "Create performant aggregations for revenue and consumption.",
+            "dependencies": [
+              "10.1"
+            ],
+            "details": "- Materialized views: monthly_revenue_mv(tenant_id, period_month, amount), daily_consumption_mv(tenant_id, period_day, consumption).\n- Indexes on (tenant_id, period_*).\n- Refresh functions: refresh_analytics_mv(p_tenant_id uuid, p_from date, p_to date) performing REFRESH MATERIALIZED VIEW CONCURRENTLY for relevant ranges.\n- Triggers or job queue: on invoices/payments/readings changes, enqueue a targeted refresh (e.g., via pg_cron/supabase scheduled functions) for the affected tenant and periods.\n- Fallback simple views when MV disabled in dev.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement REST endpoints for dashboard and series",
+            "description": "Build API handlers: /api/analytics/dashboard, /revenue, /consumption.",
+            "dependencies": [
+              "10.1",
+              "10.2"
+            ],
+            "details": "- Validate query params with zod: range/from/to, granularity.\n- Use supabase.rpc to call dashboard_metrics, revenue_series, consumption_series.\n- Normalize responses: consistent keys, decimals as numbers, periods as ISO dates.\n- Add caching headers (short max-age, stale-while-revalidate) and ETags.\n- Error handling: 400 on invalid params, 403 on unauthorized, 500 with safe message.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Permissions and data scoping (RLS-aware API)",
+            "description": "Ensure tenant isolation and least-privilege access in API layer.",
+            "dependencies": [
+              "10.3"
+            ],
+            "details": "- Extract tenant_id from authenticated JWT/Session in API handlers; do not accept tenant_id from client input.\n- Ensure RPCs rely on RLS and do not bypass policies; pass only validated args.\n- Return 403 for users without access; avoid leaking counts across tenants.\n- Add minimal audit logs for access (tenant_id, endpoint, time).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Realtime broadcast emitters on DB/server",
+            "description": "Emit events on payments and readings updates per tenant.",
+            "dependencies": [
+              "10.1",
+              "10.2"
+            ],
+            "details": "- DB triggers on invoices/payments and meter_readings to publish realtime events (e.g., via pg_notify or supabase.realtime.broadcast) to channels tenant:{tenant_id}:payments and tenant:{tenant_id}:readings.\n- Event payload minimal: {type, changed_at, affected_periods}.\n- Document channel names and event schema for client.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Dashboard UI with Recharts and filters",
+            "description": "Build executive dashboard with charts, metric cards, and date range pickers.",
+            "dependencies": [
+              "10.3",
+              "10.4"
+            ],
+            "details": "- Components: MetricCards (MRR, AR, Paid rate, Anomalies), Area chart (consumption), Bar chart (revenue), Pie chart (payment status breakdown).\n- Filters: date range (quick presets + custom), granularity switch.\n- Data hooks using TanStack Query with keys: ['dashboard', range], ['revenue', params], ['consumption', params].\n- Responsive layout; a11y labels and tooltips.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Client realtime subscriptions and cache invalidation",
+            "description": "Wire Supabase channels to refresh widgets without page reload.",
+            "dependencies": [
+              "10.5",
+              "10.6"
+            ],
+            "details": "- Subscribe to tenant:{id}:payments and tenant:{id}:readings using supabase.channel.\n- On event, invalidate Query keys for dashboard/revenue/consumption; debounce bursts.\n- Handle lifecycle: subscribe on mount, unsubscribe on unmount; reconnection logic.\n- Feature flag to disable realtime in low-bandwidth environments.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Loading, empty, and error states",
+            "description": "Implement skeletons, zero-data messages, and error boundaries.",
+            "dependencies": [
+              "10.6"
+            ],
+            "details": "- Skeletons for metric cards and charts while fetching.\n- Empty states for no invoices/readings in selected range, with helpful guidance.\n- Error fallback UI with retry and support link.\n- Accessibility: announce loading/errors to screen readers.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "PDF export of dashboard snapshot",
+            "description": "Generate PDF reports via React PDF templates.",
+            "dependencies": [
+              "10.3",
+              "10.6"
+            ],
+            "details": "- Template includes header (tenant branding, range), KPI table, charts summary.\n- Implement /api/analytics/export/pdf?from&to; server-render React PDF and stream.\n- Ensure deterministic data (same queries as UI); include generated-at timestamp and timezone.\n- File naming: analytics_{tenant}_{from}_{to}.pdf.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Excel/CSV exports for detailed reports",
+            "description": "Server-side generation of XLSX and CSV for revenue/consumption details.",
+            "dependencies": [
+              "10.3",
+              "10.2"
+            ],
+            "details": "- Endpoints: /api/analytics/export/revenue.{xlsx|csv}, /consumption.{xlsx|csv} with same filters.\n- Use a streaming writer (e.g., exceljs/sheetjs + Node streams) to handle large datasets.\n- Columns: period, amount/consumption, status breakdown; include summary sheet with KPIs.\n- Content headers, file naming, and memory limits; pagination fallback for CSV.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Unit tests for aggregations and RPCs",
+            "description": "Validate SQL/RPC correctness with seeded sample data.",
+            "dependencies": [
+              "10.1",
+              "10.2",
+              "10.3"
+            ],
+            "details": "- Use Vitest + supabase-js against local DB.\n- Seed invoices/payments/readings across multiple tenants and periods.\n- Assert dashboard_metrics totals, revenue_series sums, consumption_series values, and rounding.\n- Edge cases: empty ranges, cross-month, timezone boundaries.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "Integration tests: UI, realtime, and exports",
+            "description": "End-to-end verification of charts vs SQL, realtime updates, and exports.",
+            "dependencies": [
+              "10.6",
+              "10.7",
+              "10.8",
+              "10.9",
+              "10.10"
+            ],
+            "details": "- Render dashboard (Testing Library/Playwright), compare visible KPIs to direct SQL queries.\n- Insert a payment and a reading; verify UI updates within seconds via realtime.\n- Generate PDF and XLSX/CSV; validate files open, headers present, and totals match API.\n- Permission checks: user without tenant access gets 403; cross-tenant data not visible.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-14T02:45:19.050Z",
+      "updated": "2025-08-14T03:14:01.907Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

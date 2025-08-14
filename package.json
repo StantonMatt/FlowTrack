@@ -1,0 +1,22 @@
+{
+  "name": "flowtrack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multi-tenant SaaS platform for water utility meter reading and billing",
+  "scripts": {
+    "dev": "pnpm -C apps/web dev",
+    "build": "pnpm -C apps/web build",
+    "start": "pnpm -C apps/web start",
+    "typecheck": "pnpm -C apps/web tsc --noEmit",
+    "lint": "pnpm -C apps/web lint",
+    "test": "pnpm -C apps/web test"
+  },
+  "keywords": ["water-utility", "billing", "meter-reading", "saas", "pwa"],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  }
+}

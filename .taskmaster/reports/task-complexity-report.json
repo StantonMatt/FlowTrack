@@ -1,0 +1,93 @@
+{
+	"meta": {
+		"generatedAt": "2025-08-14T02:49:21.525Z",
+		"tasksAnalyzed": 10,
+		"totalTasks": 10,
+		"analysisCount": 10,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": false
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Project and Environment Setup (Next.js 15 + Supabase + Tooling)",
+			"complexityScore": 6,
+			"recommendedSubtasks": 12,
+			"expansionPrompt": "Break this setup into ~12 subtasks covering: repo and pnpm workspace init; Next.js 15 scaffold with App Router; TypeScript and path aliases; Tailwind config and shadcn/ui init plus component generation; Serwist integration (next.config, app/sw.ts, caching rules); Supabase local stack (supabase init/start), env management via zod, shared libs (supabaseClient, env, tenant); Stripe/Resend/Google Maps key wiring; ESLint/Prettier/Vitest/RTL baseline plus tsconfig tweaks; Husky + lint-staged; Docker compose for local services; CI-ready scripts and basic GitHub Actions. For each subtask, list commands, files to modify, acceptance checks (from testStrategy), and rollback notes.",
+			"reasoning": "Many moving parts but mostly standardized tooling and scaffolding patterns; integration breadth is higher than depth."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Database Schema, Migrations, and RLS in Supabase",
+			"complexityScore": 8,
+			"recommendedSubtasks": 10,
+			"expansionPrompt": "Decompose into ~10 subtasks: model review and ERD; write 0001_init.sql for core tables and enums; define foreign keys and cascades; enable RLS on all tables; implement auth.tenant_id() helper; author tenant isolation policies per table; add functional and composite indexes; write 0002_seed.sql; create SQL test scripts for RLS simulation and supabase-js script for JWT-based checks; performance EXPLAIN plans and documentation of access patterns. Include DoD per table (RLS enforced, indexes used by queries, lint passes).",
+			"reasoning": "Designing multi-tenant schema with strict RLS and indexes is non-trivial and error-prone; requires careful testing and iteration."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Multi-tenant Authentication, RBAC, and Subdomain Routing",
+			"complexityScore": 8,
+			"recommendedSubtasks": 12,
+			"expansionPrompt": "Split into ~12 subtasks: Supabase Auth configuration and email templates; tenant registration flow (create tenant, admin user, metadata); JWT custom claims or Postgres claim injection; Next.js API routes for register/login/logout/refresh/magic-link; middleware for subdomain parsing and x-tenant propagation; server client wrappers enforcing tenant; RBAC permissions map and can() utility; route guards (server and client); Zustand user/tenant store with persistence; audit logging for auth events; test suite (unit for RBAC, integration for auth flows and cross-tenant denial); security review and hardening notes.",
+			"reasoning": "Combines auth flows, JWT tenancy, routing concerns, and authorization; multiple integration points with security implications."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Admin Dashboard Shell, Navigation, and Providers",
+			"complexityScore": 5,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Break into ~8 subtasks: app/(admin)/layout with SSR providers (QueryClient, Theme, Auth); header and sidebar navigation with shadcn/ui; breadcrumb component and route mapping; tenant branding fetch and theme injection; global search modal with debounced server action; access control guard at layout level; testing (RTL rendering, a11y checks, snapshots); theming documentation and examples.",
+			"reasoning": "Primarily UI scaffolding and provider wiring with limited business logic; moderate complexity for SSR and theming."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Customer Management: CRUD, Search/Filters, CSV Import, Address Validation",
+			"complexityScore": 8,
+			"recommendedSubtasks": 14,
+			"expansionPrompt": "Decompose into ~14 subtasks: zod schemas and types; account number sequence design and transactional generator; REST API for list/detail/create/update/delete with soft delete and filters; server-side export endpoint; list UI with TanStack Table, pagination, filters; create/edit forms with RHF and zodResolver; Google Places autocomplete and geocoding normalization with lat/lng; import pipeline (upload, parse CSV/Excel, validate, chunked insert, job tracking); import progress UI and error reporting; permissions checks per role; rate limiting and payload size guards; integration tests for filters and RLS; concurrency tests for account numbers; docs for import templates.",
+			"reasoning": "Full CRUD plus bulk import/export and external API integration increases surface area, concurrency, and error handling needs."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "PWA Offline Infrastructure: Service Worker, IndexedDB (Dexie), and Sync Manager",
+			"complexityScore": 7,
+			"recommendedSubtasks": 12,
+			"expansionPrompt": "Split into ~12 subtasks: Serwist config and precache manifest; runtime caching strategies per resource; background sync queue for POST /api/readings/sync; Dexie schema (readingsQueue, photos) and migrations; SyncManager with batching, backoff, idempotency, last-write-wins; connectivity listeners and UX toasts; photo capture flow and local storage, upload to Supabase Storage during sync; auth and tenant context propagation in SW/fetch; conflict resolution rules; telemetry/logging of sync outcomes; unit tests for Dexie and sync logic; manual offline E2E checklist.",
+			"reasoning": "Offline-first adds complexity around storage consistency, background processing, and error/retry semantics."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Meter Reading & Consumption Tracking: UI, API, Validation, Anomaly Detection",
+			"complexityScore": 8,
+			"recommendedSubtasks": 14,
+			"expansionPrompt": "Decompose into ~14 subtasks: API routes for get/post/bulk/sync with idempotency; previous reading lookup and consumption calculation; anomaly rules per tenant with thresholds; photo upload integration and signed URL handling; transactional bulk insert with partial failure reporting; realtime publish on insert; mobile-optimized entry form (lookup, keypad, camera); bulk grid with paste and inline validation; reading history page with charts; RLS and permission checks; duplicate detection and de-dup policy definition; unit tests for anomaly and idempotency; integration tests for sequences; monitoring and alerting for anomaly spikes.",
+			"reasoning": "Mixes transactional data logic, media handling, realtime updates, and specialized UIs; correctness and idempotency are key."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Automated Billing & Invoicing Engine with PDFs and Email Delivery",
+			"complexityScore": 9,
+			"recommendedSubtasks": 16,
+			"expansionPrompt": "Break into ~16 subtasks: schema for rate_plans and tenant_rate_rules; invoice sequence table and locking; billing Edge Function to aggregate consumption, compute charges, and create invoices; idempotency for period and tenant; cron schedule per tenant and last_run bookkeeping; PDF template with branding and storage upload; email sender via Resend with links/attachments; manual generate endpoint; invoice fetch and secure signed URL endpoint; currency/rounding and tax rules; error handling and partial failures; overdue detection job and reminders; auditing and reconciliation reports; performance tuning and batching; unit tests for rate calc; end-to-end test for monthly run.",
+			"reasoning": "Batch financial processing, PDF generation, scheduling, and email delivery require robust idempotency and correctness guarantees."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Stripe Payments: Checkout, Webhooks, Reconciliation, and Receipts",
+			"complexityScore": 7,
+			"recommendedSubtasks": 12,
+			"expansionPrompt": "Decompose into ~12 subtasks: payments table design and relations; create checkout session API with metadata and success/cancel URLs; webhook endpoint with signature verification and idempotency; event handlers for success/failure/refund updating invoices and payments; receipt email via Resend; UI payment modal and Elements or Checkout redirect; guardrails to verify tenant and invoice ownership; ACH and wallet enablement config; retry and error handling policies; Stripe CLI local test harness; integration tests for happy and failure paths; documentation for reconciliation and refunds.",
+			"reasoning": "Leverages Stripe primitives but requires secure webhook handling, state transitions, and tenant-aware reconciliation."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Analytics Dashboard and Reporting (Realtime + Exports)",
+			"complexityScore": 7,
+			"recommendedSubtasks": 12,
+			"expansionPrompt": "Split into ~12 subtasks: define analytics metrics and SQL/RPCs; implement REST endpoints for dashboard and detailed series; materialized views or pre-aggregations and refresh strategy; realtime subscriptions wiring to invalidate queries; charts UI with Recharts and date range filters; loading and empty states; PDF export of dashboard snapshot; Excel/CSV exports for detailed reports; permissions and data scoping; performance checks with EXPLAIN and indexes; unit tests for aggregations; integration tests validating charts vs SQL outputs.",
+			"reasoning": "Combines aggregation logic, realtime updates, and export generation; performance and correctness across large datasets matter."
+		}
+	]
+}

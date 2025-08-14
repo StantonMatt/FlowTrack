@@ -1,0 +1,771 @@
+# Product Requirements Document: FlowTrack
+
+## Overview
+
+FlowTrack is a modern, multi-tenant SaaS platform that enables small to medium utility companies to digitize their operations. It solves the critical problem of utilities relying on spreadsheets, paper forms, and disconnected systems to manage customers, track consumption, generate invoices, and process payments.
+
+**Target Market:** Water, gas, and electric utility companies with 100-10,000 customers who need an affordable, modern alternative to enterprise systems.
+
+**Value Proposition:** FlowTrack provides enterprise-grade utility management capabilities at a fraction of the cost, with offline-first mobile capabilities for field workers, real-time data synchronization, and automated billing workflows that reduce operational costs by 40%.
+
+## Core Features
+
+### Multi-Tenant Architecture
+**What it does:** Isolates each utility company's data in a shared infrastructure while maintaining complete data privacy and customization options.
+
+**Why it's important:** Enables SaaS economics - multiple companies share infrastructure costs while maintaining enterprise-level security and isolation.
+
+**How it works:** Row-level security policies in Supabase automatically filter all queries by tenant_id, ensuring companies only see their own data. Each tenant gets a unique subdomain (e.g., citywater.flowtrack.app).
+
+### Customer Management System
+**What it does:** Comprehensive database of all utility customers with service addresses, billing information, meter assignments, and consumption history.
+
+**Why it's important:** Centralizes customer data that's typically scattered across spreadsheets, eliminating data entry errors and providing instant access to customer information.
+
+**How it works:** Full CRUD operations with advanced search, bulk import via CSV/Excel, address validation via Google Maps API, and automatic account number generation.
+
+### Meter Reading & Consumption Tracking
+**What it does:** Captures meter readings through multiple channels (manual entry, mobile app, bulk import) with automatic consumption calculation and anomaly detection.
+
+**Why it's important:** Field workers can submit readings offline via mobile devices, eliminating paper forms and re-entry. Anomaly detection prevents billing errors from incorrect readings.
+
+**How it works:** PWA with offline storage using IndexedDB, automatic background sync when connection restored, photo capture for reading verification, and configurable validation rules.
+
+### Automated Billing & Invoicing
+**What it does:** Generates invoices based on consumption data, applies complex rate structures (tiered, seasonal, time-of-use), and delivers via email or customer portal.
+
+**Why it's important:** Reduces billing cycle from days to hours, eliminates manual calculations, and ensures consistent application of rates.
+
+**How it works:** Scheduled jobs generate invoices monthly, PDF generation with company branding, automatic email delivery, and overdue reminders.
+
+### Payment Processing
+**What it does:** Accepts online payments via credit card, ACH, or digital wallets with automatic invoice reconciliation.
+
+**Why it's important:** Improves cash flow with faster payments, reduces processing costs, and provides customers convenient payment options.
+
+**How it works:** Stripe integration for payment processing, customer portal for self-service, recurring payment options, and automatic receipt generation.
+
+### Real-time Analytics Dashboard
+**What it does:** Visualizes key metrics including revenue, consumption trends, payment status, and operational efficiency.
+
+**Why it's important:** Provides instant visibility into business performance, identifies trends, and supports data-driven decision making.
+
+**How it works:** Interactive charts using Recharts, real-time updates via Supabase subscriptions, exportable reports in PDF/Excel formats.
+
+### Customer Self-Service Portal
+**What it does:** Allows customers to view usage history, download invoices, make payments, and update contact information.
+
+**Why it's important:** Reduces support calls by 60%, improves customer satisfaction, and enables 24/7 service access.
+
+**How it works:** Secure authentication with magic links or passwords, responsive design for mobile access, and real-time usage data.
+
+## User Experience
+
+### User Personas
+
+**1. Utility Administrator (Primary User)**
+- Role: Operations manager or owner
+- Goals: Oversee operations, monitor revenue, ensure accurate billing
+- Pain Points: Manual processes, lack of visibility, time-consuming reporting
+- Technical Skill: Moderate
+
+**2. Field Worker/Meter Reader**
+- Role: Collects meter readings in the field
+- Goals: Quickly enter readings, work offline, minimize errors
+- Pain Points: Paper forms, no offline access, re-entering data
+- Technical Skill: Low to moderate
+
+**3. Office Staff**
+- Role: Customer service, billing clerk
+- Goals: Process customer requests, generate invoices, handle payments
+- Pain Points: Switching between systems, manual calculations
+- Technical Skill: Moderate
+
+**4. Utility Customer**
+- Role: End consumer of utility services
+- Goals: Pay bills online, track usage, understand charges
+- Pain Points: Paper bills only, unclear charges, inconvenient payment
+- Technical Skill: Variable
+
+### Key User Flows
+
+**Meter Reading Collection Flow:**
+1. Field worker opens PWA on mobile device
+2. Views assigned route with customer list
+3. Navigates to customer location (offline maps)
+4. Enters reading and captures photo
+5. Data saves locally if offline
+6. Automatic sync when connection restored
+7. Anomalies flagged for review
+
+**Invoice Generation Flow:**
+1. System runs monthly on schedule
+2. Calculates consumption from readings
+3. Applies rate structure and taxes
+4. Generates PDF invoices
+5. Emails to customers
+6. Updates dashboard metrics
+
+**Customer Payment Flow:**
+1. Customer receives invoice email
+2. Clicks payment link
+3. Reviews invoice details
+4. Enters payment information
+5. Receives confirmation
+6. Invoice marked as paid
+
+### UI/UX Considerations
+
+**Design Principles:**
+- Mobile-first responsive design
+- Offline-first architecture for field operations
+- Progressive disclosure of complex features
+- Consistent design language using shadcn/ui
+- Accessibility compliance (WCAG 2.1 AA)
+
+**Information Architecture:**
+- Dashboard (home) provides at-a-glance metrics
+- Primary navigation: Customers, Readings, Billing, Reports
+- Search accessible from every page
+- Breadcrumb navigation for context
+
+# Technical Architecture
+
+## System Components
+
+### Frontend Architecture
+```
+Next.js 15 App (Vercel)
+├── Marketing Website (SSG)
+├── Admin Dashboard (SSR + Client)
+├── Customer Portal (SSR + Client)
+└── Mobile PWA (CSR + Offline)
+```
+
+### Backend Services
+```
+Supabase Platform
+├── PostgreSQL Database (RLS-enabled)
+├── Authentication Service
+├── Realtime Subscriptions
+├── Storage Service (Files/Images)
+└── Edge Functions (Serverless)
+
+Next.js API Routes
+├── CSV/Excel Processing
+├── PDF Generation
+├── Complex Calculations
+└── Third-party Integrations
+```
+
+### External Services
+```
+Stripe → Payment Processing
+Resend → Transactional Email
+Google Maps → Address Validation
+Vercel → Hosting & CDN
+```
+
+## Data Models
+
+### Core Entities
+```typescript
+// Tenant (Company)
+interface Tenant {
+  id: string
+  name: string
+  subdomain: string
+  settings: {
+    timezone: string
+    currency: string
+    billingCycle: 'monthly' | 'bimonthly' | 'quarterly'
+    logo?: string
+    colors?: ThemeColors
+  }
+  subscription: {
+    plan: 'starter' | 'professional' | 'enterprise'
+    status: 'active' | 'past_due' | 'cancelled'
+  }
+}
+
+// User (Staff)
+interface User {
+  id: string
+  tenantId: string
+  email: string
+  role: 'admin' | 'manager' | 'operator' | 'viewer'
+  profile: {
+    firstName: string
+    lastName: string
+    phone?: string
+  }
+}
+
+// Customer
+interface Customer {
+  id: string
+  tenantId: string
+  accountNumber: string
+  status: 'active' | 'inactive' | 'suspended'
+  personalInfo: {
+    firstName: string
+    lastName: string
+    email?: string
+    phone?: string
+  }
+  serviceAddress: Address
+  billingAddress?: Address
+  meter: {
+    id: string
+    type: 'water' | 'gas' | 'electric'
+    serialNumber: string
+  }
+  ratePlan: string
+}
+
+// Meter Reading
+interface MeterReading {
+  id: string
+  tenantId: string
+  customerId: string
+  meterId: string
+  reading: number
+  previousReading: number
+  consumption: number
+  readingDate: Date
+  photo?: string
+  validation: {
+    isEstimated: boolean
+    isValidated: boolean
+    anomalyFlag?: 'high' | 'low' | 'negative'
+  }
+  metadata: {
+    readBy: string
+    method: 'manual' | 'mobile' | 'import' | 'iot'
+    location?: { lat: number; lng: number }
+    offlineSync?: boolean
+  }
+}
+
+// Invoice
+interface Invoice {
+  id: string
+  tenantId: string
+  customerId: string
+  invoiceNumber: string
+  period: {
+    start: Date
+    end: Date
+  }
+  lineItems: InvoiceLineItem[]
+  totals: {
+    subtotal: number
+    tax: number
+    adjustments: number
+    total: number
+  }
+  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+  payment?: {
+    amount: number
+    date: Date
+    method: string
+    transactionId: string
+  }
+}
+```
+
+### Database Schema with RLS
+```sql
+-- Enable Row Level Security
+ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE meter_readings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+
+-- Tenant Isolation Policy
+CREATE POLICY "tenant_isolation" ON customers
+  FOR ALL 
+  USING (tenant_id = auth.jwt()->>'tenant_id');
+
+-- Customer Self-Service Policy  
+CREATE POLICY "customer_self_service" ON invoices
+  FOR SELECT
+  USING (
+    customer_id = auth.uid() 
+    OR tenant_id = auth.jwt()->>'tenant_id'
+  );
+
+-- Indexes for Performance
+CREATE INDEX idx_customers_tenant_status 
+  ON customers(tenant_id, status);
+CREATE INDEX idx_readings_customer_date 
+  ON meter_readings(customer_id, reading_date DESC);
+CREATE INDEX idx_invoices_status 
+  ON invoices(tenant_id, status);
+```
+
+## APIs and Integrations
+
+### REST API Endpoints
+```typescript
+// Authentication
+POST   /api/auth/register          // New tenant signup
+POST   /api/auth/login             // User login
+POST   /api/auth/refresh           // Refresh token
+POST   /api/auth/magic-link        // Customer portal access
+
+// Customers
+GET    /api/customers              // List with pagination
+POST   /api/customers              // Create customer
+GET    /api/customers/:id          // Get details
+PUT    /api/customers/:id          // Update customer
+DELETE /api/customers/:id          // Soft delete
+POST   /api/customers/import       // Bulk import
+
+// Meter Readings
+GET    /api/readings               // List with filters
+POST   /api/readings               // Submit reading
+POST   /api/readings/bulk          // Bulk submission
+POST   /api/readings/sync          // Offline sync
+
+// Billing
+POST   /api/invoices/generate      // Generate invoices
+GET    /api/invoices/:id           // Get invoice
+GET    /api/invoices/:id/pdf       // Download PDF
+POST   /api/invoices/:id/send      // Email invoice
+
+// Payments
+POST   /api/payments/session       // Create Stripe session
+POST   /api/payments/webhook       // Stripe webhook
+GET    /api/payments/history       // Payment history
+
+// Analytics
+GET    /api/analytics/dashboard    // Dashboard metrics
+GET    /api/analytics/revenue      // Revenue reports
+GET    /api/analytics/consumption  // Usage analysis
+```
+
+### Real-time Subscriptions
+```typescript
+// Supabase Realtime Channels
+- tenant:{id}:readings     // New readings
+- tenant:{id}:payments     // Payment updates
+- tenant:{id}:alerts       // System alerts
+- customer:{id}:invoices   // Customer's new invoices
+```
+
+## Infrastructure Requirements
+
+### Development Environment
+```yaml
+Local Development:
+  - Node.js 20+ LTS
+  - Docker Desktop
+  - Supabase CLI
+  
+Docker Services:
+  - Supabase Local (includes PostgreSQL, Auth, Storage)
+  - Stripe CLI (webhook testing)
+```
+
+### Production Environment
+```yaml
+Hosting:
+  Frontend: Vercel (Next.js optimized)
+  Backend: Supabase Cloud + Vercel Functions
+  
+Database:
+  Primary: Supabase PostgreSQL
+  Cache: Supabase built-in
+  
+Storage:
+  Files: Supabase Storage
+  
+CDN:
+  Static Assets: Vercel Edge Network
+  User Uploads: Supabase CDN
+  
+Monitoring:
+  APM: Vercel Analytics
+  Errors: Sentry
+  Logs: Supabase Dashboard
+```
+
+# Development Roadmap
+
+## Phase 1: Foundation & Authentication (MVP Core)
+
+**Objective:** Establish core infrastructure and multi-tenant authentication
+
+**Deliverables:**
+- Project setup with Next.js 15, TypeScript, Tailwind CSS
+- Supabase project initialization with database schema
+- Multi-tenant data model with RLS policies
+- Authentication system:
+  - Tenant registration flow
+  - User login/logout with JWT
+  - Role-based access control
+  - Password reset functionality
+- Basic admin dashboard shell with navigation
+- Landing page with feature overview
+- Development environment with Docker
+
+**Technical Details:**
+- Configure Supabase Auth with custom claims for tenant_id
+- Implement tenant isolation at database level
+- Create protected route middleware
+- Setup Zustand store for user state
+- Configure ESLint, Prettier, Husky
+
+## Phase 2: Customer Management (First Usable Feature)
+
+**Objective:** Complete CRUD operations for customer management
+
+**Deliverables:**
+- Customer list page with pagination
+- Advanced search with filters
+- Add/Edit customer forms with validation
+- Customer detail view
+- Bulk import from CSV/Excel
+- Export functionality
+- Address validation with Google Maps
+- Customer status management
+
+**Technical Details:**
+- Implement TanStack Query for data fetching
+- Create reusable data table component
+- File upload handling with progress
+- Background processing for imports
+- Implement Zod schemas for validation
+
+## Phase 3: Meter Reading System (Core Business Logic)
+
+**Objective:** Enable meter reading collection with offline support
+
+**Deliverables:**
+- Reading entry form with validation
+- Bulk reading entry grid
+- Mobile-optimized reading interface
+- Offline storage with Dexie.js
+- Background sync when online
+- Photo capture for readings
+- Anomaly detection alerts
+- Reading history view
+- Consumption calculations
+
+**Technical Details:**
+- Implement PWA with Serwist
+- Configure IndexedDB schema
+- Create sync queue for offline readings
+- Implement validation rules engine
+- Add camera integration for mobile
+
+## Phase 4: Billing & Invoicing (Revenue Generation)
+
+**Objective:** Automate invoice generation and delivery
+
+**Deliverables:**
+- Rate configuration interface
+- Invoice generation engine
+- PDF invoice templates
+- Batch invoice generation
+- Email delivery system
+- Invoice preview/edit
+- Credit/debit adjustments
+- Invoice history
+- Overdue notifications
+
+**Technical Details:**
+- Implement PDF generation with React PDF
+- Create Supabase Edge Functions for batch processing
+- Setup Resend for transactional emails
+- Implement scheduled jobs with cron
+- Create invoice numbering system
+
+## Phase 5: Payment Processing (Close the Loop)
+
+**Objective:** Enable online payment collection
+
+**Deliverables:**
+- Stripe integration
+- Payment page/modal
+- Multiple payment methods
+- Payment confirmation flow
+- Receipt generation
+- Payment history
+- Refund processing
+- Failed payment handling
+- Recurring payments setup
+
+**Technical Details:**
+- Implement Stripe Checkout
+- Setup webhook handlers
+- Create payment reconciliation
+- Implement retry logic
+- Add payment notifications
+
+## Phase 6: Customer Portal (Self-Service)
+
+**Objective:** Reduce support load with customer self-service
+
+**Deliverables:**
+- Customer authentication (magic link)
+- Usage dashboard
+- Invoice history & downloads
+- Online payment interface
+- Profile management
+- Usage alerts setup
+- Support ticket system
+- Mobile-responsive design
+
+**Technical Details:**
+- Implement separate auth flow for customers
+- Create customer-specific RLS policies
+- Build responsive dashboard
+- Add GraphQL subscriptions for real-time updates
+
+## Phase 7: Analytics & Reporting (Intelligence Layer)
+
+**Objective:** Provide actionable insights through data visualization
+
+**Deliverables:**
+- Executive dashboard
+- Revenue analytics
+- Consumption trends
+- Customer insights
+- Operational metrics
+- Custom report builder
+- Scheduled reports
+- Export functionality
+
+**Technical Details:**
+- Implement Recharts for visualizations
+- Create data aggregation functions
+- Build report templates
+- Add export to PDF/Excel
+- Implement report scheduling
+
+## Phase 8: Advanced Features (Differentiation)
+
+**Objective:** Add features that set FlowTrack apart
+
+**Deliverables:**
+- Real-time notifications system
+- Leak detection algorithms
+- Predictive analytics
+- Map view of customers
+- Route optimization for readers
+- API for third-party integrations
+- Webhook system
+- Advanced user permissions
+- White-label customization
+
+**Technical Details:**
+- Implement WebSocket connections
+- Create ML models for predictions
+- Add mapping with Leaflet
+- Build REST API documentation
+- Implement webhook delivery system
+
+## Phase 9: Performance & Polish (Production Ready)
+
+**Objective:** Optimize for production use
+
+**Deliverables:**
+- Performance optimizations
+- Security audit & fixes
+- Load testing
+- Error handling improvements
+- Documentation completion
+- UI/UX refinements
+- Accessibility compliance
+- SEO optimization
+
+**Technical Details:**
+- Implement caching strategies
+- Optimize database queries
+- Add rate limiting
+- Improve error boundaries
+- Complete WCAG compliance
+
+## Phase 10: Scale & Enterprise (Growth)
+
+**Objective:** Add enterprise features for larger clients
+
+**Deliverables:**
+- Advanced multi-tenancy (departments)
+- SSO integration (SAML/OAuth)
+- Audit logging
+- Advanced permissions
+- Custom workflows
+- API rate limiting
+- SLA monitoring
+- Backup & recovery
+
+**Technical Details:**
+- Implement department-level isolation
+- Add SAML support
+- Create audit trail system
+- Build workflow engine
+- Implement disaster recovery
+
+# Logical Dependency Chain
+
+## Foundation Layer (Must Build First)
+1. **Database & Auth Setup** → Everything depends on multi-tenant structure
+2. **Basic Dashboard Shell** → Provides navigation framework for all features
+3. **RLS Policies** → Security must be established before any data operations
+
+## Core Business Logic (Sequential Build)
+1. **Customer Management** → Required before readings can be assigned
+2. **Meter Readings** → Required before consumption can be calculated
+3. **Consumption Calculation** → Required before invoices can be generated
+4. **Invoice Generation** → Required before payments can be processed
+
+## Parallel Development Opportunities
+Once Phase 3 is complete, these can be developed in parallel:
+- **Customer Portal** (separate auth flow)
+- **Analytics** (read-only operations)
+- **Mobile PWA** (enhancement of existing features)
+
+## Progressive Enhancement Path
+Each feature starts basic and gets enhanced:
+1. **Readings:** Manual entry → Bulk import → Mobile offline → IoT integration
+2. **Billing:** Simple rates → Tiered → Time-of-use → Dynamic pricing
+3. **Payments:** Manual recording → Stripe checkout → Recurring → Autopay
+4. **Analytics:** Basic charts → Interactive → Predictive → AI-powered
+
+## Critical Integration Points
+- **After Phase 2:** Can demonstrate to potential users
+- **After Phase 4:** Can run pilot with real utility
+- **After Phase 5:** Can process real revenue
+- **After Phase 6:** Can reduce support workload
+
+# Risks and Mitigations
+
+## Technical Challenges
+
+**Risk:** Complex multi-tenancy implementation
+- **Mitigation:** Use Supabase RLS from start, test isolation thoroughly
+- **Validation:** Create automated tests for tenant isolation
+
+**Risk:** Offline sync conflicts
+- **Mitigation:** Implement conflict resolution strategy, last-write-wins for readings
+- **Validation:** Extensive testing of offline scenarios
+
+**Risk:** Payment processing compliance
+- **Mitigation:** Use Stripe's compliant infrastructure, avoid storing card data
+- **Validation:** PCI compliance checklist
+
+## MVP Scoping Risks
+
+**Risk:** MVP too complex to complete
+- **Mitigation:** Phase 1-3 creates usable system, can stop there if needed
+- **Validation:** Each phase delivers working software
+
+**Risk:** Missing critical feature for utilities
+- **Mitigation:** Interview 3-5 utility companies during Phase 1
+- **Validation:** Continuous user feedback loop
+
+## Resource Constraints
+
+**Risk:** Single developer bottleneck
+- **Mitigation:** Use managed services (Supabase, Stripe, Vercel)
+- **Validation:** Measure velocity after Phase 1
+
+**Risk:** Cost overruns on cloud services
+- **Mitigation:** Start with free tiers, monitor usage closely
+- **Validation:** Set up billing alerts
+
+**Risk:** Scope creep from user requests
+- **Mitigation:** Maintain strict phase boundaries, document future features
+- **Validation:** Regular review of roadmap priorities
+
+# Appendix
+
+## Technical Specifications
+
+### PWA Configuration
+```typescript
+// next.config.js
+const withSerwist = require("@serwist/next").default({
+  swSrc: "app/sw.ts",
+  swDest: "public/sw.js",
+  disable: process.env.NODE_ENV === "development",
+});
+
+module.exports = withSerwist({
+  reactStrictMode: true,
+  images: {
+    domains: ['supabase.co'],
+  },
+});
+```
+
+### Supabase RLS Example
+```sql
+-- Complete tenant isolation example
+CREATE OR REPLACE FUNCTION auth.tenant_id() 
+RETURNS TEXT AS $$
+  SELECT COALESCE(
+    current_setting('request.jwt.claims', true)::json->>'tenant_id',
+    (SELECT tenant_id FROM users WHERE id = auth.uid())
+  )::TEXT
+$$ LANGUAGE SQL STABLE;
+
+CREATE POLICY "tenant_isolation_policy" ON customers
+  FOR ALL
+  USING (tenant_id = auth.tenant_id())
+  WITH CHECK (tenant_id = auth.tenant_id());
+```
+
+### Offline Sync Strategy
+```typescript
+// lib/sync/syncManager.ts
+class SyncManager {
+  async syncReadings() {
+    const pending = await db.readings
+      .where('synced').equals(0)
+      .toArray();
+    
+    for (const reading of pending) {
+      try {
+        const { data } = await supabase
+          .from('meter_readings')
+          .insert(reading);
+        
+        if (data) {
+          await db.readings.update(reading.id, { 
+            synced: 1,
+            syncedAt: new Date()
+          });
+        }
+      } catch (error) {
+        console.error('Sync failed:', reading.id);
+        // Retry logic here
+      }
+    }
+  }
+}
+```
+
+## Research Findings
+
+### Utility Industry Requirements
+- Average utility processes 5,000-10,000 readings per month
+- 15% of readings typically flagged as anomalies
+- 60% of customers prefer online payment options
+- Field workers need offline capability 40% of the time
+- Billing errors cost average utility $50,000/year
+
+### Competitive Analysis
+- Enterprise solutions (Oracle, SAP): $100k+ annually
+- Mid-market solutions: $20-50k annually  
+- FlowTrack target: $299-999/month (accessible to small utilities)
+
+### Technology Decisions
+- **Supabase over Firebase:** PostgreSQL better for relational data
+- **Next.js over Remix:** Larger ecosystem, better Vercel integration
+- **Dexie over raw IndexedDB:** Simpler API, better TypeScript support
+- **Stripe over PayPal:** Better developer experience, more features
