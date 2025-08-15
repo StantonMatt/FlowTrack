@@ -53,17 +53,48 @@ export default function LoginPage() {
   };
 
   const handleDemoLogin = async () => {
-    // Pre-fill with demo credentials and auto-submit
+    // Pre-fill with demo credentials
     setEmail('demo@flowtrack.app');
     setPassword('demo123456');
+    setIsLoading(true);
+    setError('');
     
-    // Auto-submit after a brief delay to show the credentials
-    setTimeout(() => {
-      const form = document.querySelector('form');
-      if (form) {
-        form.requestSubmit();
+    try {
+      // Directly call the API without form submission
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          email: 'demo@flowtrack.app', 
+          password: 'demo123456' 
+        }),
+      });
+
+      const data = await response.json();
+      console.log('Demo login response:', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
       }
-    }, 500);
+
+      // Check if login was successful
+      if (data.success) {
+        console.log('Demo login successful, redirecting to:', returnUrl);
+        // Store token in localStorage for demo purposes
+        if (data.data?.session?.access_token) {
+          localStorage.setItem('demo_token', data.data.session.access_token);
+        }
+        // Force redirect
+        window.location.href = returnUrl;
+      } else {
+        throw new Error('Login failed');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -165,9 +196,10 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={handleDemoLogin}
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                disabled={isLoading}
+                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Quick Demo Login
+                {isLoading ? 'Logging in...' : 'Quick Demo Login'}
               </button>
               <button
                 type="button"
