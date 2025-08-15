@@ -35,6 +35,11 @@ const PUBLIC_PATHS = [
   '/auth/confirm'
 ]
 
+// Demo paths for testing without authentication
+const DEMO_PATHS = [
+  '/demo'
+]
+
 // Static asset paths to skip
 const STATIC_PATHS = [
   '/_next',
@@ -87,7 +92,8 @@ export async function middleware(request: NextRequest) {
   }
   
   // Check authentication for protected routes
-  if (!PUBLIC_PATHS.includes(pathname) && !pathname.startsWith('/api/auth')) {
+  const isDemoPath = DEMO_PATHS.some(path => pathname.startsWith(path))
+  if (!PUBLIC_PATHS.includes(pathname) && !pathname.startsWith('/api/auth') && !isDemoPath) {
     const isAuthenticated = response.headers.get('x-user-id')
     
     if (!isAuthenticated) {
