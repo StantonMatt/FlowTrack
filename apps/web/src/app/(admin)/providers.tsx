@@ -5,7 +5,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { Toaster } from '@/components/ui/toaster'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface ProvidersProps {
   children: React.ReactNode
@@ -43,19 +43,21 @@ export function Providers({ children, tenantBranding, initialUser }: ProvidersPr
       })
   )
 
-  // Apply tenant branding to CSS variables
-  if (tenantBranding && typeof document !== 'undefined') {
-    const root = document.documentElement
-    if (tenantBranding.primaryColor) {
-      // Convert hex to HSL for shadcn/ui theming
-      const hsl = hexToHSL(tenantBranding.primaryColor)
-      root.style.setProperty('--primary', hsl)
+  // Apply tenant branding to CSS variables after mount to avoid hydration mismatch
+  useEffect(() => {
+    if (tenantBranding) {
+      const root = document.documentElement
+      if (tenantBranding.primaryColor) {
+        // Convert hex to HSL for shadcn/ui theming
+        const hsl = hexToHSL(tenantBranding.primaryColor)
+        root.style.setProperty('--primary', hsl)
+      }
+      if (tenantBranding.secondaryColor) {
+        const hsl = hexToHSL(tenantBranding.secondaryColor)
+        root.style.setProperty('--secondary', hsl)
+      }
     }
-    if (tenantBranding.secondaryColor) {
-      const hsl = hexToHSL(tenantBranding.secondaryColor)
-      root.style.setProperty('--secondary', hsl)
-    }
-  }
+  }, [tenantBranding])
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -64,6 +66,7 @@ export function Providers({ children, tenantBranding, initialUser }: ProvidersPr
         defaultTheme="system"
         enableSystem
         disableTransitionOnChange
+        suppressHydrationWarning
       >
         <AuthProvider>
           {children}

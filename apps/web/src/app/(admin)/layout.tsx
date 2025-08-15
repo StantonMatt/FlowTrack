@@ -38,7 +38,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
         branding: {
           primary_color: '#0066CC',
           secondary_color: '#00AA55',
-          logo_url: '/demo-logo.png'
+          logo_url: '/demo-logo.svg'
         }
       }
     }
