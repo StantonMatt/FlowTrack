@@ -128,7 +128,7 @@ export default function BulkReadingEntryPage({ params }: PageProps) {
       <div className="mt-6 flex justify-between items-center">
         <div className="text-sm text-gray-600">
           <p>💡 Tip: You can paste data from Excel directly into the grid</p>
-          <p>⚠️ High consumption (>500) is highlighted</p>
+          <p>⚠️ High consumption (&gt;500) is highlighted</p>
         </div>
         <button
           onClick={handleSubmit}
