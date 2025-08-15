@@ -7,16 +7,31 @@
     "dev": "pnpm -C apps/web dev",
     "build": "pnpm -C apps/web build",
     "start": "pnpm -C apps/web start",
-    "typecheck": "pnpm -C apps/web tsc --noEmit",
+    "typecheck": "pnpm --filter web typecheck",
     "lint": "pnpm -C apps/web lint",
-    "test": "pnpm -C apps/web test"
+    "test": "pnpm --filter web test"
   },
-  "keywords": ["water-utility", "billing", "meter-reading", "saas", "pwa"],
+  "keywords": [
+    "water-utility",
+    "billing",
+    "meter-reading",
+    "saas",
+    "pwa"
+  ],
   "author": "",
   "license": "MIT",
   "packageManager": "pnpm@10.14.0",
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=10.0.0"
+  },
+  "dependencies": {
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-popover": "^1.1.15",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-separator": "^1.1.7",
+    "@serwist/background-sync": "^9.1.1",
+    "cmdk": "^1.1.1",
+    "react-day-picker": "^9.8.1"
   }
 }

@@ -3,8 +3,14 @@
     "allow": [
       "mcp__supabase__list_tables",
       "mcp__supabase__list_extensions",
-      "mcp__supabase__get_project_url"
-    ]
+      "mcp__supabase__get_project_url",
+      "mcp__task-master-ai__get_tasks",
+      "mcp__supabase__apply_migration",
+      "Bash(npx supabase migration:*)",
+      "Bash(npx supabase link:*)",
+      "Bash(mv:*)"
+    ],
+    "defaultMode": "acceptEdits"
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
