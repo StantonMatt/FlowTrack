@@ -54,6 +54,8 @@ const STATIC_PATHS = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
+  console.log('Middleware running for:', pathname)
+  
   // Skip middleware for static assets
   if (STATIC_PATHS.some(path => pathname.startsWith(path))) {
     return NextResponse.next()
@@ -95,6 +97,16 @@ export async function middleware(request: NextRequest) {
   // Check authentication for protected routes
   const isDemoPath = DEMO_PATHS.some(path => pathname.startsWith(path))
   
+  // Debug logging
+  if (pathname === '/admin') {
+    console.log('Admin route check:', {
+      pathname,
+      isDemoPath,
+      DEMO_PATHS,
+      check: DEMO_PATHS.some(path => pathname.startsWith(path))
+    })
+  }
+  
   // Check for demo cookie
   const hasDemoCookie = request.cookies.get('demo_auth')?.value === 'true'
   
@@ -102,6 +114,7 @@ export async function middleware(request: NextRequest) {
     const isAuthenticated = response.headers.get('x-user-id') || hasDemoCookie
     
     if (!isAuthenticated) {
+      console.log('Redirecting to login:', { pathname, isDemoPath, isAuthenticated })
       // Redirect to login with return URL
       const url = request.nextUrl.clone()
       url.pathname = '/login'
