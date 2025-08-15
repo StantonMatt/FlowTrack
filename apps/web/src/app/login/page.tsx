@@ -86,8 +86,12 @@ export default function LoginPage() {
         if (data.data?.session?.access_token) {
           localStorage.setItem('demo_token', data.data.session.access_token);
         }
-        // Force redirect
-        window.location.href = returnUrl;
+        // Force redirect with multiple methods
+        setTimeout(() => {
+          console.log('Attempting redirect now...');
+          window.location.replace(returnUrl);
+        }, 100);
+        return; // Exit early to prevent error handling
       } else {
         throw new Error('Login failed');
       }
@@ -223,6 +227,15 @@ export default function LoginPage() {
           <p className="text-sm text-blue-800 font-medium">Demo Credentials:</p>
           <p className="text-sm text-blue-700">Email: demo@flowtrack.app</p>
           <p className="text-sm text-blue-700">Password: demo123456</p>
+          <div className="mt-3 pt-3 border-t border-blue-200">
+            <p className="text-sm text-blue-800 mb-2">Or skip login for testing:</p>
+            <a 
+              href="/admin"
+              className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+            >
+              Go directly to Admin →
+            </a>
+          </div>
         </div>
       </div>
     </div>
