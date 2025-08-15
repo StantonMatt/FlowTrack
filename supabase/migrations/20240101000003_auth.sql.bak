@@ -1,0 +1,339 @@
+-- ============================================
+-- AUTH CONFIGURATION AND JWT CUSTOM CLAIMS
+-- ============================================
+
+-- Create auth schema tables if not exists
+CREATE SCHEMA IF NOT EXISTS auth;
+
+-- ============================================
+-- USER PROFILES TRIGGER
+-- ============================================
+
+-- Function to sync user metadata to our users table
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+    -- Extract tenant_id and role from raw_user_meta_data
+    IF NEW.raw_user_meta_data->>'tenant_id' IS NOT NULL THEN
+        INSERT INTO public.users (
+            auth_user_id,
+            tenant_id,
+            email,
+            full_name,
+            role,
+            is_active,
+            created_at,
+            updated_at
+        ) VALUES (
+            NEW.id,
+            (NEW.raw_user_meta_data->>'tenant_id')::UUID,
+            NEW.email,
+            COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
+            COALESCE(NEW.raw_user_meta_data->>'role', 'viewer')::user_role,
+            true,
+            NOW(),
+            NOW()
+        );
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to create user profile on auth.users insert
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_new_user();
+
+-- ============================================
+-- JWT CUSTOM CLAIMS
+-- ============================================
+
+-- Function to add custom claims to JWT
+CREATE OR REPLACE FUNCTION auth.custom_access_token_hook(event jsonb)
+RETURNS jsonb AS $$
+DECLARE
+    user_tenant_id UUID;
+    user_role TEXT;
+    user_subdomain TEXT;
+BEGIN
+    -- Get user's tenant_id and role from the users table
+    SELECT 
+        u.tenant_id,
+        u.role::TEXT,
+        t.subdomain
+    INTO 
+        user_tenant_id,
+        user_role,
+        user_subdomain
+    FROM public.users u
+    LEFT JOIN public.tenants t ON t.id = u.tenant_id
+    WHERE u.auth_user_id = (event->>'user_id')::UUID;
+    
+    -- Add custom claims to the JWT
+    IF user_tenant_id IS NOT NULL THEN
+        event := jsonb_set(event, '{claims, tenant_id}', to_jsonb(user_tenant_id));
+        event := jsonb_set(event, '{claims, role}', to_jsonb(user_role));
+        event := jsonb_set(event, '{claims, subdomain}', to_jsonb(user_subdomain));
+    END IF;
+    
+    RETURN event;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- Grant necessary permissions
+GRANT EXECUTE ON FUNCTION auth.custom_access_token_hook TO supabase_auth_admin;
+GRANT USAGE ON SCHEMA auth TO supabase_auth_admin;
+
+-- ============================================
+-- IMPROVED AUTH HELPER FUNCTIONS
+-- ============================================
+
+-- Enhanced function to get current tenant_id from JWT
+CREATE OR REPLACE FUNCTION auth.tenant_id()
+RETURNS UUID AS $$
+BEGIN
+    -- Try multiple sources for tenant_id
+    RETURN COALESCE(
+        -- From custom JWT claims
+        (current_setting('request.jwt.claims', true)::json->>'tenant_id')::UUID,
+        -- From app_metadata
+        (current_setting('request.jwt.claims', true)::json->'app_metadata'->>'tenant_id')::UUID,
+        -- From user_metadata
+        (current_setting('request.jwt.claims', true)::json->'user_metadata'->>'tenant_id')::UUID,
+        -- From users table lookup
+        (SELECT tenant_id FROM public.users WHERE auth_user_id = auth.uid() LIMIT 1)
+    );
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN NULL;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- Enhanced function to get current user role from JWT
+CREATE OR REPLACE FUNCTION auth.user_role()
+RETURNS TEXT AS $$
+BEGIN
+    RETURN COALESCE(
+        -- From custom JWT claims
+        current_setting('request.jwt.claims', true)::json->>'role',
+        -- From app_metadata
+        current_setting('request.jwt.claims', true)::json->'app_metadata'->>'role',
+        -- From user_metadata
+        current_setting('request.jwt.claims', true)::json->'user_metadata'->>'role',
+        -- From users table lookup
+        (SELECT role::TEXT FROM public.users WHERE auth_user_id = auth.uid() LIMIT 1),
+        'viewer'
+    );
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN 'viewer';
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- Function to check if user has permission
+CREATE OR REPLACE FUNCTION auth.has_permission(required_permission TEXT)
+RETURNS BOOLEAN AS $$
+DECLARE
+    user_role_val TEXT;
+BEGIN
+    user_role_val := auth.user_role();
+    
+    -- Admin has all permissions
+    IF user_role_val = 'admin' THEN
+        RETURN TRUE;
+    END IF;
+    
+    -- Check specific permissions based on role
+    CASE user_role_val
+        WHEN 'manager' THEN
+            RETURN required_permission IN (
+                'customers:read', 'customers:write', 'customers:delete',
+                'readings:read', 'readings:write', 'readings:delete',
+                'billing:read', 'billing:write', 'billing:delete',
+                'reports:read', 'reports:write'
+            );
+        WHEN 'operator' THEN
+            RETURN required_permission IN (
+                'customers:read',
+                'readings:read', 'readings:write',
+                'billing:read'
+            );
+        WHEN 'viewer' THEN
+            RETURN required_permission LIKE '%:read';
+        ELSE
+            RETURN FALSE;
+    END CASE;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- ============================================
+-- TENANT VALIDATION
+-- ============================================
+
+-- Function to validate subdomain format and uniqueness
+CREATE OR REPLACE FUNCTION public.validate_subdomain()
+RETURNS TRIGGER AS $$
+DECLARE
+    reserved_subdomains TEXT[] := ARRAY['www', 'app', 'api', 'admin', 'dashboard', 'auth', 'login', 'signup', 'register', 'blog', 'docs', 'help', 'support', 'status', 'staging', 'dev', 'test', 'demo', 'mail', 'email', 'ftp', 'ssh'];
+BEGIN
+    -- Check format (lowercase, alphanumeric with hyphens, 3-63 chars)
+    IF NOT (NEW.subdomain ~ '^[a-z0-9]([a-z0-9-]{1,61}[a-z0-9])?$') THEN
+        RAISE EXCEPTION 'Invalid subdomain format. Must be lowercase alphanumeric with hyphens, 3-63 characters.';
+    END IF;
+    
+    -- Check reserved subdomains
+    IF NEW.subdomain = ANY(reserved_subdomains) THEN
+        RAISE EXCEPTION 'Subdomain "%" is reserved and cannot be used.', NEW.subdomain;
+    END IF;
+    
+    -- Check uniqueness (the UNIQUE constraint will also handle this)
+    IF EXISTS (SELECT 1 FROM tenants WHERE subdomain = NEW.subdomain AND id != NEW.id) THEN
+        RAISE EXCEPTION 'Subdomain "%" is already taken.', NEW.subdomain;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Add trigger for subdomain validation
+DROP TRIGGER IF EXISTS validate_subdomain_trigger ON tenants;
+CREATE TRIGGER validate_subdomain_trigger
+    BEFORE INSERT OR UPDATE ON tenants
+    FOR EACH ROW
+    EXECUTE FUNCTION public.validate_subdomain();
+
+-- ============================================
+-- CUSTOMER PORTAL ACCESS
+-- ============================================
+
+-- Function to check if email belongs to a customer
+CREATE OR REPLACE FUNCTION public.is_customer_email(email_input TEXT)
+RETURNS TABLE (
+    customer_id UUID,
+    tenant_id UUID,
+    is_active BOOLEAN
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        c.id as customer_id,
+        c.tenant_id,
+        c.status = 'active' as is_active
+    FROM customers c
+    WHERE LOWER(c.email) = LOWER(email_input)
+    LIMIT 1;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- ============================================
+-- AUDIT LOG FOR AUTH EVENTS
+-- ============================================
+
+-- Create auth audit log table
+CREATE TABLE IF NOT EXISTS auth_audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id UUID,
+    event_type VARCHAR(50) NOT NULL,
+    event_data JSONB DEFAULT '{}',
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index for auth audit logs
+CREATE INDEX idx_auth_audit_logs_tenant_user ON auth_audit_logs(tenant_id, user_id, created_at DESC);
+CREATE INDEX idx_auth_audit_logs_event_type ON auth_audit_logs(event_type, created_at DESC);
+
+-- Enable RLS on auth audit logs
+ALTER TABLE auth_audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- RLS policy for auth audit logs (admins only)
+CREATE POLICY auth_audit_logs_admin_only ON auth_audit_logs
+    FOR ALL
+    USING (
+        tenant_id = auth.tenant_id() 
+        AND auth.user_role() = 'admin'
+    );
+
+-- Function to log auth events
+CREATE OR REPLACE FUNCTION public.log_auth_event(
+    p_event_type VARCHAR(50),
+    p_user_id UUID DEFAULT NULL,
+    p_tenant_id UUID DEFAULT NULL,
+    p_event_data JSONB DEFAULT '{}',
+    p_ip_address INET DEFAULT NULL,
+    p_user_agent TEXT DEFAULT NULL
+)
+RETURNS UUID AS $$
+DECLARE
+    log_id UUID;
+BEGIN
+    INSERT INTO auth_audit_logs (
+        tenant_id,
+        user_id,
+        event_type,
+        event_data,
+        ip_address,
+        user_agent
+    ) VALUES (
+        p_tenant_id,
+        p_user_id,
+        p_event_type,
+        p_event_data,
+        p_ip_address,
+        p_user_agent
+    ) RETURNING id INTO log_id;
+    
+    RETURN log_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================
+-- SESSION MANAGEMENT
+-- ============================================
+
+-- Table to track active sessions (optional, for session management)
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    session_token TEXT UNIQUE NOT NULL,
+    ip_address INET,
+    user_agent TEXT,
+    last_activity TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index for session lookups
+CREATE INDEX idx_user_sessions_token ON user_sessions(session_token);
+CREATE INDEX idx_user_sessions_user_tenant ON user_sessions(user_id, tenant_id);
+CREATE INDEX idx_user_sessions_expires ON user_sessions(expires_at);
+
+-- Function to clean up expired sessions
+CREATE OR REPLACE FUNCTION public.cleanup_expired_sessions()
+RETURNS void AS $$
+BEGIN
+    DELETE FROM user_sessions WHERE expires_at < NOW();
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================
+-- GRANTS
+-- ============================================
+
+-- Grant necessary permissions
+GRANT USAGE ON SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO service_role;
+
+-- Grant specific permissions for authenticated users
+GRANT SELECT ON auth_audit_logs TO authenticated;
+GRANT EXECUTE ON FUNCTION public.log_auth_event TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_customer_email TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION auth.has_permission TO authenticated;
