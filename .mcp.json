@@ -10,7 +10,7 @@
         "--project-ref=frgonqebopovsctmhhrn"
       ],
       "env": {
-        "SUPABASE_ACCESS_TOKEN": "sbp_f8dfb3356be12de2a8b2fac6aec7e7adf7db5ef3"
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}"
       }},
 		"task-master-ai": {
 			"type": "stdio",
