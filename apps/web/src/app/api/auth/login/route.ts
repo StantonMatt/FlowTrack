@@ -15,6 +15,36 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = loginSchema.parse(body)
     
+    // Demo login bypass for testing
+    if (validatedData.email === 'demo@flowtrack.app' && validatedData.password === 'demo123456') {
+      return NextResponse.json({
+        success: true,
+        message: 'Demo login successful',
+        data: {
+          user: {
+            id: 'demo-user-id',
+            email: 'demo@flowtrack.app',
+            fullName: 'Demo User',
+            role: 'admin',
+            profile: {}
+          },
+          tenant: {
+            id: 'demo-tenant-id',
+            name: 'Demo Water Company',
+            subdomain: 'demo',
+            settings: {},
+            branding: {}
+          },
+          session: {
+            access_token: 'demo-access-token',
+            refresh_token: 'demo-refresh-token',
+            expires_at: new Date(Date.now() + 3600000).toISOString(),
+            expires_in: 3600
+          }
+        }
+      })
+    }
+    
     // Get Supabase client
     const supabase = await createClient()
     

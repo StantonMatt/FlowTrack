@@ -41,10 +41,18 @@ export default function LoginPage() {
     }
   };
 
-  const handleDemoLogin = () => {
-    // Pre-fill with demo credentials
+  const handleDemoLogin = async () => {
+    // Pre-fill with demo credentials and auto-submit
     setEmail('demo@flowtrack.app');
     setPassword('demo123456');
+    
+    // Auto-submit after a brief delay to show the credentials
+    setTimeout(() => {
+      const form = document.querySelector('form');
+      if (form) {
+        form.requestSubmit();
+      }
+    }, 500);
   };
 
   return (
@@ -148,7 +156,7 @@ export default function LoginPage() {
                 onClick={handleDemoLogin}
                 className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
               >
-                Demo Login
+                Quick Demo Login
               </button>
               <button
                 type="button"
