@@ -1,0 +1,6 @@
+account_number,meter_number,reading_date,reading_value,previous_reading,consumption,reading_type,anomaly_flag,notes,recorded_by
+1234567890,MTR-001234,2024-01-15,12345,12000,345,manual,,Normal reading,field_tech_01
+1234567891,MTR-001235,2024-01-15,23456,23000,456,manual,,Clear access,field_tech_01
+1234567892,MTR-001236,2024-01-15,34567,34000,567,manual,high_usage,Unusually high consumption,field_tech_02
+1234567893,MTR-001237,2024-01-15,45678,45000,678,estimated,,Unable to access meter,system
+1234567894,MTR-001238,2024-01-15,56789,56000,789,automated,,AMR reading,system
