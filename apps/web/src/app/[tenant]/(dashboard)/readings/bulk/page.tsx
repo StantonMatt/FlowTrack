@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, use } from 'react';
 
 interface PageProps {
-  params: { tenant: string };
+  params: Promise<{ tenant: string }>;
 }
 
 interface Reading {
@@ -17,6 +17,7 @@ interface Reading {
 }
 
 export default function BulkReadingEntryPage({ params }: PageProps) {
+  const { tenant } = use(params);
   const [readings, setReadings] = useState<Reading[]>([
     { id: 1, account: 'ACC-001', customerName: 'John Doe', previousReading: 12000, currentReading: 0, consumption: 0, notes: '' },
     { id: 2, account: 'ACC-002', customerName: 'Jane Smith', previousReading: 11800, currentReading: 0, consumption: 0, notes: '' },

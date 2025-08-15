@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, use } from 'react';
 
 interface PageProps {
-  params: { tenant: string };
+  params: Promise<{ tenant: string }>;
 }
 
 interface Reading {
@@ -18,6 +18,7 @@ interface Reading {
 }
 
 export default function ReadingHistoryPage({ params }: PageProps) {
+  const { tenant } = use(params);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('all');
   const [dateRange, setDateRange] = useState('30days');
 

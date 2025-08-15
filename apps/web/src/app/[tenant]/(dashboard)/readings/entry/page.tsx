@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, use } from 'react';
 
 interface PageProps {
-  params: { tenant: string };
+  params: Promise<{ tenant: string }>;
 }
 
 export default function ReadingEntryPage({ params }: PageProps) {
+  const { tenant } = use(params);
   const [reading, setReading] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
