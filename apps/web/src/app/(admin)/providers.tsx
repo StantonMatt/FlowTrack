@@ -25,7 +25,7 @@ interface ProvidersProps {
   }
 }
 
-export function Providers({ children, tenantBranding, initialUser }: ProvidersProps) {
+export function Providers({ children, tenantBranding }: ProvidersProps) {
   const [queryClient] = useState(
     () =>
       new QueryClient({

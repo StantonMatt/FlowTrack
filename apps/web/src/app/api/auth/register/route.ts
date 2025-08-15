@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 
 // Validation schema
 const registerSchema = z.object({

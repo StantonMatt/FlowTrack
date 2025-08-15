@@ -62,7 +62,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Update Supabase session
-  let response = await updateSession(request)
+  const response = await updateSession(request)
   
   // Get hostname and extract subdomain
   const hostname = request.headers.get('host') || ''

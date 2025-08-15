@@ -70,7 +70,7 @@ export const POST = withRole('operator')(async (req: NextRequest, context: ApiCo
     await fs.writeFile(tempFilePath, buffer);
 
     // Parse file based on type
-    let parsedRows: any[] = [];
+    let parsedRows: Record<string, unknown>[] = [];
     let headers: string[] = [];
     
     if (fileType === 'csv') {
@@ -102,7 +102,7 @@ export const POST = withRole('operator')(async (req: NextRequest, context: ApiCo
       const jsonData = XLSX.utils.sheet_to_json(worksheet, {
         header: 1,
         defval: '',
-      }) as any[][];
+      }) as unknown[][];
       
       if (jsonData.length < 2) {
         return NextResponse.json(
@@ -118,7 +118,7 @@ export const POST = withRole('operator')(async (req: NextRequest, context: ApiCo
       
       // Convert to objects
       parsedRows = jsonData.slice(1).map(row => {
-        const obj: any = {};
+        const obj: Record<string, unknown> = {};
         headers.forEach((header, index) => {
           obj[header] = row[index] || '';
         });
@@ -142,7 +142,11 @@ export const POST = withRole('operator')(async (req: NextRequest, context: ApiCo
     }
 
     // Basic validation of rows
-    const validationErrors: any[] = [];
+    interface ValidationError {
+      row: number;
+      errors: string[];
+    }
+    const validationErrors: ValidationError[] = [];
     parsedRows.forEach((row, index) => {
       try {
         // Convert row to our schema format
@@ -167,7 +171,7 @@ export const POST = withRole('operator')(async (req: NextRequest, context: ApiCo
         
         // Basic validation
         importRowSchema.parse(importRow);
-      } catch (error: any) {
+      } catch (error) {
         if (validationErrors.length < 10) { // Limit error reporting
           validationErrors.push({
             row: index + 2,
@@ -307,7 +311,7 @@ async function processImportJob(
           }
 
           successCount++;
-        } catch (error: any) {
+        } catch (error) {
           failedCount++;
           errors.push({
             row: row.row_number,

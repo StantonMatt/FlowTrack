@@ -17,9 +17,6 @@ export default async function AdminDashboard() {
   
   const supabase = await createClient()
   
-  // For demo mode, filter data by demo tenant
-  const tenantId = isDemoMode ? '11111111-1111-1111-1111-111111111111' : null
-  
   // Fetch dashboard statistics
   const stats = await getDashboardStats(supabase)
   
@@ -63,7 +60,7 @@ export default async function AdminDashboard() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Welcome back! Here's an overview of your water utility.
+            Welcome back! Here&apos;s an overview of your water utility.
           </p>
         </div>
 

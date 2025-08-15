@@ -94,7 +94,7 @@ export const GET = withRole('viewer')(async (req: NextRequest, context: ApiConte
     ];
 
     // Helper function to escape CSV values
-    const escapeCSV = (value: any): string => {
+    const escapeCSV = (value: unknown): string => {
       if (value === null || value === undefined) return '';
       const str = String(value);
       if (str.includes(',') || str.includes('"') || str.includes('\n')) {
@@ -104,7 +104,7 @@ export const GET = withRole('viewer')(async (req: NextRequest, context: ApiConte
     };
 
     // Helper function to extract address fields
-    const getAddress = (address: any) => ({
+    const getAddress = (address: Record<string, unknown> | null | undefined) => ({
       street: address?.street || '',
       city: address?.city || '',
       state: address?.state || '',
@@ -170,10 +170,10 @@ export const GET = withRole('viewer')(async (req: NextRequest, context: ApiConte
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Export error:', error);
     return NextResponse.json(
-      { error: error.message || 'Export failed' },
+      { error: error instanceof Error ? error.message : 'Export failed' },
       { status: 500 }
     );
   }
