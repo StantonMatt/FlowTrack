@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { getDashboardStats } from '@/lib/database/queries'
 import { Breadcrumbs } from '@/components/admin/breadcrumbs'
@@ -11,6 +12,39 @@ export const metadata: Metadata = {
 }
 
 export default async function AdminDashboard() {
+  const cookieStore = await cookies()
+  const isDemoMode = cookieStore.get('demo_auth')?.value === 'true'
+  
+  // Return demo dashboard if in demo mode
+  if (isDemoMode) {
+    return (
+      <div className="flex flex-col p-6">
+        <h1 className="text-3xl font-bold mb-6">Dashboard (Demo Mode)</h1>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-sm text-gray-600">Total Customers</div>
+            <div className="text-2xl font-bold">1,234</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-sm text-gray-600">Readings Today</div>
+            <div className="text-2xl font-bold">89</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-sm text-gray-600">Revenue This Month</div>
+            <div className="text-2xl font-bold">$45,678</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-sm text-gray-600">Overdue Invoices</div>
+            <div className="text-2xl font-bold text-red-600">12</div>
+          </div>
+        </div>
+        <p className="text-gray-600">
+          This is a demo mode. Login with real credentials to see actual data.
+        </p>
+      </div>
+    )
+  }
+  
   const supabase = await createClient()
   
   // Fetch dashboard statistics

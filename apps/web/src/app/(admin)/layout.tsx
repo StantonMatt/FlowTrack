@@ -18,6 +18,26 @@ interface AdminLayoutProps {
 }
 
 export default async function AdminLayout({ children }: AdminLayoutProps) {
+  // Check for demo mode first
+  const cookieStore = await cookies()
+  const isDemoMode = cookieStore.get('demo_auth')?.value === 'true'
+  
+  if (isDemoMode) {
+    // Return a simplified layout for demo mode
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white shadow">
+          <div className="px-4 py-4">
+            <h1 className="text-xl font-semibold">FlowTrack Admin (Demo Mode)</h1>
+          </div>
+        </div>
+        <div className="p-4">
+          {children}
+        </div>
+      </div>
+    )
+  }
+  
   // Check authentication server-side
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
