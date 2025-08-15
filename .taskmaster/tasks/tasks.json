@@ -1246,7 +1246,7 @@
               "8.9"
             ],
             "details": "Create audit views: v_billing_runs_summary and v_invoices_summary per tenant with totals, taxes, counts, and anomalies (e.g., zero-usage invoices). Export CSV endpoint for a period. Add reconciliation checks: readings sum vs billed qty, missing PDFs, unsent emails. Provide admin UI endpoints to fetch these summaries.",
-            "status": "pending",
+            "status": "in-progress",
             "testStrategy": ""
           },
           {
@@ -1590,7 +1590,7 @@
     ],
     "metadata": {
       "created": "2025-08-14T02:45:19.050Z",
-      "updated": "2025-08-15T15:20:22.693Z",
+      "updated": "2025-08-15T16:18:05.199Z",
       "description": "Tasks for master context"
     }
   }
