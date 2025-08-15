@@ -38,7 +38,8 @@ const PUBLIC_PATHS = [
 // Demo paths for testing without authentication
 const DEMO_PATHS = [
   '/demo',
-  '/admin'
+  '/admin',
+  '/(admin)'  // Include the route group
 ]
 
 // Static asset paths to skip

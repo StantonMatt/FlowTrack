@@ -27,13 +27,24 @@ export default function LoginPage() {
       });
 
       const data = await response.json();
+      console.log('Login response:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Redirect to return URL or admin dashboard
-      router.push(returnUrl);
+      // Check if login was successful
+      if (data.success) {
+        console.log('Login successful, redirecting to:', returnUrl);
+        // Store token in localStorage for demo purposes
+        if (data.data?.session?.access_token) {
+          localStorage.setItem('demo_token', data.data.session.access_token);
+        }
+        // Redirect to return URL or admin dashboard
+        window.location.href = returnUrl;
+      } else {
+        throw new Error('Login failed');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
