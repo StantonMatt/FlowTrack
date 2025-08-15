@@ -27,20 +27,26 @@ export default function LoginPage() {
       });
 
       const data = await response.json();
+      console.log('Login API response:', { status: response.status, data });
 
       if (!response.ok) {
+        console.error('Login failed:', data.error);
         throw new Error(data.error || 'Login failed');
       }
 
       // For demo login, just redirect directly
       if (data.success && email === 'demo@flowtrack.app') {
-        // Use replace to prevent back button issues
-        window.location.replace('/admin');
+        console.log('Demo login successful, redirecting to /admin');
+        // Use setTimeout to ensure cookie is set
+        setTimeout(() => {
+          window.location.href = '/admin';
+        }, 100);
         return;
       }
 
       // For real login, handle normally
       if (data.success) {
+        console.log('Login successful, redirecting to:', returnUrl);
         router.push(returnUrl);
       } else {
         throw new Error('Login failed');
