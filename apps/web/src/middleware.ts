@@ -37,7 +37,8 @@ const PUBLIC_PATHS = [
 
 // Demo paths for testing without authentication
 const DEMO_PATHS = [
-  '/demo'
+  '/demo',
+  '/admin'
 ]
 
 // Static asset paths to skip
