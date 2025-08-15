@@ -27,78 +27,34 @@ export default function LoginPage() {
       });
 
       const data = await response.json();
-      console.log('Login response:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Check if login was successful
+      // For demo login, just redirect directly
+      if (data.success && email === 'demo@flowtrack.app') {
+        // Use replace to prevent back button issues
+        window.location.replace('/admin');
+        return;
+      }
+
+      // For real login, handle normally
       if (data.success) {
-        console.log('Login successful, redirecting to:', returnUrl);
-        // Store token in localStorage for demo purposes
-        if (data.data?.session?.access_token) {
-          localStorage.setItem('demo_token', data.data.session.access_token);
-        }
-        // Redirect to return URL or admin dashboard
-        window.location.href = returnUrl;
+        router.push(returnUrl);
       } else {
         throw new Error('Login failed');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDemoLogin = async () => {
-    // Pre-fill with demo credentials
+  const handleDemoLogin = () => {
+    // Just pre-fill the credentials
     setEmail('demo@flowtrack.app');
     setPassword('demo123456');
-    setIsLoading(true);
-    setError('');
-    
-    try {
-      // Directly call the API without form submission
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          email: 'demo@flowtrack.app', 
-          password: 'demo123456' 
-        }),
-      });
-
-      const data = await response.json();
-      console.log('Demo login response:', data);
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
-      }
-
-      // Check if login was successful
-      if (data.success) {
-        console.log('Demo login successful, redirecting to:', returnUrl);
-        // Store token in localStorage for demo purposes
-        if (data.data?.session?.access_token) {
-          localStorage.setItem('demo_token', data.data.session.access_token);
-        }
-        // Force redirect with multiple methods
-        setTimeout(() => {
-          console.log('Attempting redirect now...');
-          window.location.replace(returnUrl);
-        }, 100);
-        return; // Exit early to prevent error handling
-      } else {
-        throw new Error('Login failed');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      setIsLoading(false);
-    }
   };
 
   return (
@@ -200,10 +156,9 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={handleDemoLogin}
-                disabled={isLoading}
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
               >
-                {isLoading ? 'Logging in...' : 'Quick Demo Login'}
+                Use Demo Credentials
               </button>
               <button
                 type="button"
@@ -227,15 +182,6 @@ export default function LoginPage() {
           <p className="text-sm text-blue-800 font-medium">Demo Credentials:</p>
           <p className="text-sm text-blue-700">Email: demo@flowtrack.app</p>
           <p className="text-sm text-blue-700">Password: demo123456</p>
-          <div className="mt-3 pt-3 border-t border-blue-200">
-            <p className="text-sm text-blue-800 mb-2">Or skip login for testing:</p>
-            <a 
-              href="/admin"
-              className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-            >
-              Go directly to Admin →
-            </a>
-          </div>
         </div>
       </div>
     </div>

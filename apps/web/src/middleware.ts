@@ -37,9 +37,7 @@ const PUBLIC_PATHS = [
 
 // Demo paths for testing without authentication
 const DEMO_PATHS = [
-  '/demo',
-  '/admin',
-  '/(admin)'  // Include the route group
+  '/demo'
 ]
 
 // Static asset paths to skip
@@ -95,8 +93,12 @@ export async function middleware(request: NextRequest) {
   
   // Check authentication for protected routes
   const isDemoPath = DEMO_PATHS.some(path => pathname.startsWith(path))
+  
+  // Check for demo cookie
+  const hasDemoCookie = request.cookies.get('demo_auth')?.value === 'true'
+  
   if (!PUBLIC_PATHS.includes(pathname) && !pathname.startsWith('/api/auth') && !isDemoPath) {
-    const isAuthenticated = response.headers.get('x-user-id')
+    const isAuthenticated = response.headers.get('x-user-id') || hasDemoCookie
     
     if (!isAuthenticated) {
       // Redirect to login with return URL

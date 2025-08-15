@@ -31,6 +31,11 @@ export async function updateSession(request: NextRequest) {
   // This will refresh session if expired - required for Server Components
   const { data: { user }, error } = await supabase.auth.getUser()
 
+  // Set user ID in headers if authenticated
+  if (user) {
+    supabaseResponse.headers.set('x-user-id', user.id)
+  }
+
   // Get tenant information from subdomain
   const hostname = request.headers.get('host') || ''
   const subdomain = hostname.split('.')[0]
