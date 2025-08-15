@@ -35,9 +35,10 @@ const PUBLIC_PATHS = [
   '/auth/confirm'
 ]
 
-// Demo paths for testing without authentication
+// Demo paths for testing without authentication  
 const DEMO_PATHS = [
-  '/demo'
+  '/demo',
+  '/admin'  // Allow admin access for testing
 ]
 
 // Static asset paths to skip
